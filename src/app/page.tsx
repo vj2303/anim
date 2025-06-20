@@ -1,103 +1,217 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useEffect, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { SceneManager } from '../components/SceneManager';
+import { CameraControls } from '../components/CameraControls';
+import { PathRenderer } from '../components/PathRenderer';
+import { AnimationManager } from '../components/AnimationManager';
+import { InputHandler } from '../components/InputHandler';
+import { SimpleAudioManager } from '../components/EnhancedAudioManager';
+import { useGSAP } from '../hooks/useGSAP';
+
+export default function DottedPath() {
+  const containerRef = useRef(null);
+  const sceneRef = useRef(null);
+  const rendererRef = useRef(null);
+  const cameraRef = useRef(null);
+  const controlsRef = useRef(null);
+  const animationIdRef = useRef(null);
+  
+  // Path state
+  const positionRef = useRef(0);
+  const dotsGroupRef = useRef(null);
+  const cardsGroupRef = useRef(null);
+  const textGroupRef = useRef(null);
+  const dotsArrayRef = useRef([]);
+  const textMeshesRef = useRef([]);
+  
+  // GSAP and scroll snapping
+  const isSnappingRef = useRef(false);
+  const targetPositionRef = useRef(0);
+
+  // Initialize GSAP
+  useGSAP();
+
+  // Initialize Three.js scene
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const sceneManager = new SceneManager();
+    const scene = sceneManager.createScene();
+    sceneRef.current = scene;
+
+    // Camera setup
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 15, 25);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
+
+    // Renderer setup
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      alpha: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    rendererRef.current = renderer;
+    containerRef.current.appendChild(renderer.domElement);
+
+    // Initialize camera controls
+    const cameraControls = new CameraControls(camera, renderer.domElement);
+    controlsRef.current = cameraControls;
+
+    // Setup lighting
+    sceneManager.setupLighting(scene);
+
+    // Create groups
+    const dotsGroup = new THREE.Group();
+    const cardsGroup = new THREE.Group();
+    const textGroup = new THREE.Group();
+    scene.add(dotsGroup);
+    scene.add(cardsGroup);
+    scene.add(textGroup);
+    
+    dotsGroupRef.current = dotsGroup;
+    cardsGroupRef.current = cardsGroup;
+    textGroupRef.current = textGroup;
+
+    // Initialize animation manager
+    const animationManager = new AnimationManager(
+      dotsArrayRef,
+      textMeshesRef,
+      positionRef,
+      cameraRef
+    );
+
+    // Initialize path renderer
+    const pathRenderer = new PathRenderer(
+      dotsGroupRef,
+      cardsGroupRef,
+      textGroupRef,
+      dotsArrayRef,
+      textMeshesRef,
+      positionRef,
+      cameraRef
+    );
+
+    // Create initial path
+    pathRenderer.createDottedPath();
+
+    // Render loop
+    const animate = () => {
+      cameraControls.update();
+      animationManager.animate();
+      renderer.render(scene, camera);
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+    animate();
+
+    // Handle window resize
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cameraControls.dispose();
+      
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      if (containerRef.current && renderer.domElement) {
+        containerRef.current.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
+  }, []);
+
+  // Snap to agent function
+  const snapToAgent = (direction) => {
+    if (isSnappingRef.current || !window.gsap) return;
+    
+    const currentAgent = Math.floor(positionRef.current / 60);
+    let targetAgent;
+    
+    if (direction > 0) {
+      targetAgent = currentAgent + 1;
+    } else {
+      targetAgent = Math.max(0, currentAgent - 1);
+    }
+    
+    const targetPosition = targetAgent * 60;
+    targetPositionRef.current = targetPosition;
+    
+    if (targetPosition === positionRef.current) return;
+    
+    isSnappingRef.current = true;
+    
+    window.gsap.to(positionRef, {
+      current: targetPosition,
+      duration: 1.2,
+      ease: "power2.out",
+      onUpdate: () => {
+        // Recreate path on update
+        if (dotsGroupRef.current && cardsGroupRef.current && textGroupRef.current) {
+          const pathRenderer = new PathRenderer(
+            dotsGroupRef,
+            cardsGroupRef,
+            textGroupRef,
+            dotsArrayRef,
+            textMeshesRef,
+            positionRef,
+            cameraRef
+          );
+          pathRenderer.createDottedPath();
+        }
+      },
+      onComplete: () => {
+        isSnappingRef.current = false;
+      }
+    });
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div style={{
+      margin: 0,
+      padding: 0,
+      boxSizing: 'border-box',
+      height: '100vh',
+      overflow: 'hidden',
+      fontFamily: 'Arial, sans-serif',
+      background: '#000'
+    }}>
+      <div 
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%'
+        }}
+      />
+      
+      <InputHandler 
+        snapToAgent={snapToAgent}
+        isSnappingRef={isSnappingRef}
+      />
+      
+      <SimpleAudioManager />
     </div>
   );
 }
+
+
+
+

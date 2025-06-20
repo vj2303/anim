@@ -1,0 +1,22 @@
+export const AIAgents = [
+    '🖋️ Content Writer',
+    '📊 Lead Generation',
+    '📱 App Creator',
+    '🌐 Website Creator',
+    '🎨 Design Assistant',
+    '📈 Data Analyst',
+    '🤖 Chatbot Builder',
+    '📧 Email Marketer',
+    '🎥 Video Editor',
+    '📱 Social Media Manager',
+    '🔍 SEO Optimizer',
+    '💰 Sales Assistant',
+    '📝 Blog Writer',
+    '🎙️ Podcast Creator',
+    '📊 Report Generator',
+    '🛍️ E-commerce Helper',
+    '🎯 Ad Campaign Manager',
+    '📋 Project Manager',
+    '🔧 Code Reviewer',
+    '📚 Course Creator'
+  ];
