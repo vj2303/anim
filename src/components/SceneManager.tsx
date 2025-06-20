@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 export class SceneManager {
-  createScene() {
+  createScene(): THREE.Scene {
     const scene = new THREE.Scene();
     
     // Create gradient background
@@ -9,6 +9,11 @@ export class SceneManager {
     canvas.width = 256;
     canvas.height = 256;
     const context = canvas.getContext('2d');
+    
+    if (!context) {
+      throw new Error('Failed to get 2D canvas context');
+    }
+    
     const gradient = context.createLinearGradient(0, 0, 0, 256);
     gradient.addColorStop(0, '#1a1a1a'); // Dark gray at top
     gradient.addColorStop(0.5, '#0f0f0f'); // Darker in middle
@@ -30,7 +35,7 @@ export class SceneManager {
     return scene;
   }
 
-  setupLighting(scene) {
+  setupLighting(scene: THREE.Scene): void {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
     scene.add(ambientLight);
 

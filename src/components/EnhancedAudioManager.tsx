@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 export function SimpleAudioManager() {
-  const audioRef = useRef(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
@@ -36,7 +36,7 @@ export function SimpleAudioManager() {
     };
   }, [hasUserInteracted]);
 
-  const playAudio = async () => {
+  const playAudio = async (): Promise<void> => {
     if (audioRef.current) {
       try {
         await audioRef.current.play();
@@ -47,14 +47,14 @@ export function SimpleAudioManager() {
     }
   };
 
-  const pauseAudio = () => {
+  const pauseAudio = (): void => {
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
     }
   };
 
-  const togglePlayPause = () => {
+  const togglePlayPause = (): void => {
     if (isPlaying) {
       pauseAudio();
     } else {

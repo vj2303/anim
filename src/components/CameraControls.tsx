@@ -1,29 +1,32 @@
 import * as THREE from 'three';
 
 export class CameraControls {
-  constructor(camera, domElement) {
+  private camera: THREE.PerspectiveCamera;
+  private domElement: HTMLElement;
+  
+  // Control settings
+  public enabled: boolean = true;
+  public target: THREE.Vector3 = new THREE.Vector3(0, 5, 0);
+  public minDistance: number = 15;
+  public maxDistance: number = 50;
+  public minPolarAngle: number = Math.PI * 0.2;
+  public maxPolarAngle: number = Math.PI * 0.8;
+  public enablePan: boolean = false;
+  public enableZoom: boolean = true;
+  public enableRotate: boolean = true;
+  public rotateSpeed: number = 0.3;
+  public zoomSpeed: number = 0.5;
+  public dampingFactor: number = 0.1;
+
+  // Internal state
+  private isDragging: boolean = false;
+  private previousMousePosition: { x: number; y: number } = { x: 0, y: 0 };
+  private spherical: THREE.Spherical = new THREE.Spherical();
+  private sphericalDelta: THREE.Spherical = new THREE.Spherical();
+
+  constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
     this.domElement = domElement;
-    
-    // Control settings
-    this.enabled = true;
-    this.target = new THREE.Vector3(0, 5, 0);
-    this.minDistance = 15;
-    this.maxDistance = 50;
-    this.minPolarAngle = Math.PI * 0.2;
-    this.maxPolarAngle = Math.PI * 0.8;
-    this.enablePan = false;
-    this.enableZoom = true;
-    this.enableRotate = true;
-    this.rotateSpeed = 0.3;
-    this.zoomSpeed = 0.5;
-    this.dampingFactor = 0.1;
-
-    // Internal state
-    this.isDragging = false;
-    this.previousMousePosition = { x: 0, y: 0 };
-    this.spherical = new THREE.Spherical();
-    this.sphericalDelta = new THREE.Spherical();
     
     // Set initial camera position
     this.spherical.setFromVector3(this.camera.position.clone().sub(this.target));
@@ -31,7 +34,7 @@ export class CameraControls {
     this.setupEventListeners();
   }
 
-  setupEventListeners() {
+  private setupEventListeners(): void {
     this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseMove = this.onMouseMove.bind(this);
     this.onMouseUp = this.onMouseUp.bind(this);
@@ -43,12 +46,12 @@ export class CameraControls {
     this.domElement.addEventListener('wheel', this.onWheel);
   }
 
-  onMouseDown(event) {
+  private onMouseDown(event: MouseEvent): void {
     this.isDragging = true;
     this.previousMousePosition = { x: event.clientX, y: event.clientY };
   }
 
-  onMouseMove(event) {
+  private onMouseMove(event: MouseEvent): void {
     if (!this.isDragging) return;
 
     const deltaMove = {
@@ -65,11 +68,11 @@ export class CameraControls {
     this.previousMousePosition = { x: event.clientX, y: event.clientY };
   }
 
-  onMouseUp() {
+  private onMouseUp(): void {
     this.isDragging = false;
   }
 
-  onWheel(event) {
+  private onWheel(event: WheelEvent): void {
     if (event.ctrlKey) return; // Let path navigation handle this
     
     const scale = event.deltaY > 0 ? 1.05 : 0.95;
@@ -77,7 +80,7 @@ export class CameraControls {
     this.spherical.radius = Math.max(this.minDistance, Math.min(this.maxDistance, newDistance));
   }
 
-  update() {
+  public update(): void {
     this.spherical.theta += this.sphericalDelta.theta;
     this.spherical.phi += this.sphericalDelta.phi;
     
@@ -92,7 +95,7 @@ export class CameraControls {
     this.sphericalDelta.phi *= (1 - this.dampingFactor);
   }
 
-  dispose() {
+  public dispose(): void {
     this.domElement.removeEventListener('mousedown', this.onMouseDown);
     this.domElement.removeEventListener('mousemove', this.onMouseMove);
     this.domElement.removeEventListener('mouseup', this.onMouseUp);

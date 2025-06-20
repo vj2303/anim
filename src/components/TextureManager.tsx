@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 export class TextureManager {
+  private gradientColors: string[][];
+
   constructor() {
     this.gradientColors = [
       ['#667eea', '#764ba2'], // Purple-blue
@@ -14,15 +16,19 @@ export class TextureManager {
     ];
   }
 
-  getGradientColors() {
+  getGradientColors(): string[][] {
     return this.gradientColors;
   }
 
-  createTextTexture(text, isActive = false) {
+  createTextTexture(text: string, isActive: boolean = false): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      throw new Error('Failed to get 2D canvas context');
+    }
     
     // Clear canvas
     ctx.clearRect(0, 0, 512, 128);
@@ -82,11 +88,15 @@ export class TextureManager {
     return new THREE.CanvasTexture(canvas);
   }
 
-  createBoxTexture(agentName, agentIndex) {
+  createBoxTexture(agentName: string, agentIndex: number): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      throw new Error('Failed to get 2D canvas context');
+    }
     
     const colorIndex = agentIndex % this.gradientColors.length;
     const gradient = ctx.createLinearGradient(0, 0, 512, 256);
@@ -128,6 +138,3 @@ export class TextureManager {
     return new THREE.CanvasTexture(canvas);
   }
 }
-
-
-

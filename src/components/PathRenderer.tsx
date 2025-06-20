@@ -1,9 +1,27 @@
 import * as THREE from 'three';
+import { MutableRefObject } from 'react';
 import { TextureManager } from './TextureManager';
 import { AIAgents } from '../constants/AIAgents';
 
 export class PathRenderer {
-  constructor(dotsGroupRef, cardsGroupRef, textGroupRef, dotsArrayRef, textMeshesRef, positionRef, cameraRef) {
+  private dotsGroupRef: MutableRefObject<THREE.Group | null>;
+  private cardsGroupRef: MutableRefObject<THREE.Group | null>;
+  private textGroupRef: MutableRefObject<THREE.Group | null>;
+  private dotsArrayRef: MutableRefObject<THREE.Mesh[]>;
+  private textMeshesRef: MutableRefObject<THREE.Mesh[]>;
+  private positionRef: MutableRefObject<number>;
+  private cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>;
+  private textureManager: TextureManager;
+
+  constructor(
+    dotsGroupRef: MutableRefObject<THREE.Group | null>,
+    cardsGroupRef: MutableRefObject<THREE.Group | null>,
+    textGroupRef: MutableRefObject<THREE.Group | null>,
+    dotsArrayRef: MutableRefObject<THREE.Mesh[]>,
+    textMeshesRef: MutableRefObject<THREE.Mesh[]>,
+    positionRef: MutableRefObject<number>,
+    cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+  ) {
     this.dotsGroupRef = dotsGroupRef;
     this.cardsGroupRef = cardsGroupRef;
     this.textGroupRef = textGroupRef;
@@ -14,8 +32,8 @@ export class PathRenderer {
     this.textureManager = new TextureManager();
   }
 
- // Updated createDottedPath method with increased vertical spacing
-createDottedPath() {
+  // Updated createDottedPath method with increased vertical spacing
+  createDottedPath(): void {
     if (!this.dotsGroupRef.current || !this.cardsGroupRef.current || !this.textGroupRef.current) return;
 
     // Clear existing objects
@@ -92,8 +110,8 @@ createDottedPath() {
     }
   }
 
-// Updated calculateAdvancedAlternatingCurve method with enhanced curve for first 2 dots
-calculateAdvancedAlternatingCurve(globalRowIndex) {
+  // Updated calculateAdvancedAlternatingCurve method with enhanced curve for first 2 dots
+  private calculateAdvancedAlternatingCurve(globalRowIndex: number): number {
     // Calculate screen dimensions for proper scaling
     const cameraDistance = 25;
     const fov = 75;
@@ -138,7 +156,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     const curveRange = screenWidth * 0.25;
     
     // Calculate the main curved path based on direction, centered around 0
-    let xPosition;
+    let xPosition: number;
     if (isLeftToRight) {
         // Left to right curve: start at -curveRange, end at +curveRange
         xPosition = -curveRange + (2 * curveRange) * curvedProgress;
@@ -183,7 +201,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
         const prevSectionEndProgress = 1.0;
         const prevCurvedProgress = Math.sin(prevSectionEndProgress * Math.PI * curveIntensity) / Math.sin(Math.PI * curveIntensity);
         
-        let prevSectionEndX;
+        let prevSectionEndX: number;
         if (prevSectionIsLeftToRight) {
             prevSectionEndX = -curveRange + (2 * curveRange) * prevCurvedProgress;
             prevSectionEndX += Math.sin(prevSectionEndProgress * Math.PI) * additionalCurveAmount;
@@ -198,7 +216,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
         const currentSectionStartProgress = 0.0;
         const currentCurvedProgress = Math.sin(currentSectionStartProgress * Math.PI * curveIntensity) / Math.sin(Math.PI * curveIntensity);
         
-        let currentSectionStartX;
+        let currentSectionStartX: number;
         if (isLeftToRight) {
             currentSectionStartX = -curveRange + (2 * curveRange) * currentCurvedProgress;
         } else {
@@ -229,17 +247,16 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     xPosition = Math.max(-maxOffset, Math.min(maxOffset, xPosition));
     
     return xPosition + organicVariation;
-}
-
+  }
 
   // Enhanced smoothStep function for better transitions
-  smoothStep(t) {
+  private smoothStep(t: number): number {
     // Enhanced smooth step function for more natural transitions
     return t * t * t * (t * (t * 6 - 15) + 10);
   }
   
   // Optional: Add a method to get the current angle for debugging or other purposes
-  getCurrentCircleAngle(globalRowIndex) {
+  private getCurrentCircleAngle(globalRowIndex: number): number {
     const totalAgents = 20;
     const anglePerAgent = (2 * Math.PI) / totalAgents;
     
@@ -275,11 +292,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
   }
   
   // Optional: Method to calculate Y position if you want elevation changes
-  calculateCircularElevation(globalRowIndex) {
-    const totalAgents = 20;
-    const agentSection = Math.floor(globalRowIndex / 60);
-    const positionInSection = globalRowIndex % 60;
-    const anglePerAgent = (2 * Math.PI) / totalAgents;
+  private calculateCircularElevation(globalRowIndex: number): number {
     const currentAngle = this.getCurrentCircleAngle(globalRowIndex);
     
     // Create gentle elevation changes around the circle
@@ -290,9 +303,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     return Math.sin(currentAngle * elevationFrequency) * elevationAmplitude;
   }
 
- 
-
-  getDotColor(globalRowIndex, curveOffset) {
+  private getDotColor(globalRowIndex: number, curveOffset: number): number {
     // Color dots based on their curve position and agent section
     const agentSection = Math.floor(globalRowIndex / 60);
     const normalizedCurve = Math.abs(curveOffset) / 15; // Normalize curve offset
@@ -320,7 +331,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     return new THREE.Color(r, g, b).getHex();
   }
 
-  createTransitionMarker(globalRowIndex, curveOffset, distance) {
+  private createTransitionMarker(globalRowIndex: number, curveOffset: number, distance: number): void {
     // Create a special marker at the middle of each section to show direction change
     const markerGeometry = new THREE.ConeGeometry(1, 3, 6);
     const agentSection = Math.floor(globalRowIndex / 60);
@@ -344,10 +355,10 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     const time = Date.now() * 0.001;
     marker.position.y += Math.sin(time + globalRowIndex) * 0.5;
     
-    this.dotsGroupRef.current.add(marker);
+    this.dotsGroupRef.current?.add(marker);
   }
 
-  createAgentBox(globalRowIndex, curveOffset, distance) {
+  private createAgentBox(globalRowIndex: number, curveOffset: number, distance: number): void {
     // Get AI agent name based on milestone number
     const agentIndex = (Math.floor(globalRowIndex / 60) - 1) % AIAgents.length;
     const agentName = AIAgents[agentIndex];
@@ -397,7 +408,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     // Position box high above dots with curve offset
     // Optionally add circular elevation
     const baseY = 22;
-    const circularElevation = this.calculateCircularElevation ? this.calculateCircularElevation(globalRowIndex) : 0;
+    const circularElevation = this.calculateCircularElevation(globalRowIndex);
     box.position.set(curveOffset, baseY + circularElevation, -distance);
     
     // Add floating animation with circular motion influence
@@ -413,14 +424,21 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     const facingAngle = currentAngle + Math.PI; // Face inward
     box.rotation.y += facingAngle * 0.1; // Subtle inward facing
     
-    this.cardsGroupRef.current.add(box);
+    this.cardsGroupRef.current?.add(box);
   
     // Create floating text with circular direction indicator
     this.createFloatingText(agentName, globalRowIndex, curveOffset, distance, isClockwise, currentAngle);
   }
   
   // Updated createFloatingText to handle circular path
-  createFloatingText(agentName, globalRowIndex, curveOffset, distance, isClockwise, currentAngle) {
+  private createFloatingText(
+    agentName: string, 
+    globalRowIndex: number, 
+    curveOffset: number, 
+    distance: number, 
+    isClockwise: boolean, 
+    currentAngle: number
+  ): void {
     const textGeometry = new THREE.PlaneGeometry(14, 3.5);
     const currentAgent = Math.floor(this.positionRef.current / 60);
     const isActive = Math.floor(globalRowIndex / 60) - 1 === currentAgent;
@@ -441,7 +459,7 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     
     // Position text in front of the card with circular elevation
     const textBaseY = 27;
-    const circularElevation = this.calculateCircularElevation ? this.calculateCircularElevation(globalRowIndex) : 0;
+    const circularElevation = this.calculateCircularElevation(globalRowIndex);
     textMesh.position.set(curveOffset, textBaseY + circularElevation, -distance + 10);
     
     // Store data for animation
@@ -454,13 +472,12 @@ calculateAdvancedAlternatingCurve(globalRowIndex) {
     };
     
     // Make text face the camera with slight angle based on circular position
-    textMesh.lookAt(this.cameraRef.current.position);
-    textMesh.rotation.z += Math.sin(currentAngle) * 0.1; // Slight tilt based on circle position
+    if (this.cameraRef.current) {
+      textMesh.lookAt(this.cameraRef.current.position);
+      textMesh.rotation.z += Math.sin(currentAngle) * 0.1; // Slight tilt based on circle position
+    }
     
-    this.textGroupRef.current.add(textMesh);
+    this.textGroupRef.current?.add(textMesh);
     this.textMeshesRef.current[Math.floor(globalRowIndex / 60) - 1] = textMesh;
   }
-
 }
-
-

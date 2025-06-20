@@ -1,7 +1,20 @@
 import { TextureManager } from './TextureManager';
+import * as THREE from 'three';
+import { MutableRefObject } from 'react';
 
 export class AnimationManager {
-  constructor(dotsArrayRef, textMeshesRef, positionRef, cameraRef) {
+  private dotsArrayRef: MutableRefObject<THREE.Mesh[]>;
+  private textMeshesRef: MutableRefObject<THREE.Mesh[]>;
+  private positionRef: MutableRefObject<number>;
+  private cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>;
+  private textureManager: TextureManager;
+
+  constructor(
+    dotsArrayRef: MutableRefObject<THREE.Mesh[]>,
+    textMeshesRef: MutableRefObject<THREE.Mesh[]>,
+    positionRef: MutableRefObject<number>,
+    cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+  ) {
     this.dotsArrayRef = dotsArrayRef;
     this.textMeshesRef = textMeshesRef;
     this.positionRef = positionRef;
@@ -9,12 +22,12 @@ export class AnimationManager {
     this.textureManager = new TextureManager();
   }
 
-  animate() {
+  animate(): void {
     this.animateBlinking();
     this.animateFloatingText();
   }
 
-  animateBlinking() {
+  private animateBlinking(): void {
     const time = Date.now() * 0.001;
     
     this.dotsArrayRef.current.forEach((dot, index) => {
@@ -30,20 +43,20 @@ export class AnimationManager {
       
       if (randomBlink) {
         // Bright white flash
-        dot.material.color.setHex(0xffffff);
-        dot.material.opacity = 1;
+        (dot.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
+        (dot.material as THREE.MeshBasicMaterial).opacity = 1;
         dot.scale.setScalar(1.15);
       } else {
         // Normal pulsing between gray and slightly brighter
         const intensity = (blinkWave + 1) * 0.5;
         const grayValue = 0.65 + intensity * 0.15;
-        dot.material.color.setRGB(grayValue, grayValue, grayValue);
+        (dot.material as THREE.MeshBasicMaterial).color.setRGB(grayValue, grayValue, grayValue);
         dot.scale.setScalar(1);
       }
     });
   }
 
-  animateFloatingText() {
+  private animateFloatingText(): void {
     const time = Date.now() * 0.001;
     const currentAgent = Math.floor(this.positionRef.current / 60);
     
@@ -57,8 +70,8 @@ export class AnimationManager {
       // Update texture based on active state
       if (textMesh.userData.isActive !== isActive) {
         textMesh.userData.isActive = isActive;
-        textMesh.material.map = this.textureManager.createTextTexture(textMesh.userData.text, isActive);
-        textMesh.material.needsUpdate = true;
+        (textMesh.material as THREE.MeshBasicMaterial).map = this.textureManager.createTextTexture(textMesh.userData.text, isActive);
+        (textMesh.material as THREE.MeshBasicMaterial).needsUpdate = true;
       }
       
       // Bouncy animation for active text
@@ -85,7 +98,7 @@ export class AnimationManager {
       // Fade based on distance
       const fadeDistance = 120; // Start fading at 2 agents away
       const opacity = Math.max(0.1, 1 - Math.max(0, distanceFromCurrent - 60) / fadeDistance);
-      textMesh.material.opacity = opacity;
+      (textMesh.material as THREE.MeshBasicMaterial).opacity = opacity;
     });
   }
 }
