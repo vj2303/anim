@@ -6,27 +6,18 @@ import { SceneManager } from '../components/SceneManager';
 import { CameraControls } from '../components/CameraControls';
 import { PathRenderer } from '../components/PathRenderer';
 import { AnimationManager } from '../components/AnimationManager';
-import { InputHandler } from '../components/InputHandler';
+import { EnhancedMomentumScroller } from '../components/EnhancedMomentumScroller';
 import { SimpleAudioManager } from '../components/EnhancedAudioManager';
 import { useGSAP } from '../hooks/useGSAP';
 
-// Define types for GSAP on window
-interface GSAPTarget {
-  current: number;
-}
-
-interface GSAPVars {
-  current: number;
-  duration: number;
-  ease: string;
-  onUpdate?: () => void;
-  onComplete?: () => void;
-}
-
+// Enhanced GSAP types
 declare global {
   interface Window {
     gsap?: {
-      to: (target: GSAPTarget, vars: GSAPVars) => void;
+      to: (target: any, vars: any) => any;
+      killTweensOf: (target: any) => void;
+      timeline: () => any;
+      set: (target: any, vars: any) => void;
     };
   }
 }
@@ -47,9 +38,14 @@ export default function DottedPath() {
   const dotsArrayRef = useRef<THREE.Mesh[]>([]);
   const textMeshesRef = useRef<THREE.Mesh[]>([]);
   
-  // GSAP and scroll snapping
-  const isSnappingRef = useRef(false);
-  const targetPositionRef = useRef(0);
+  // Component references
+  const pathRendererRef = useRef<PathRenderer | null>(null);
+  const animationManagerRef = useRef<AnimationManager | null>(null);
+  const momentumScrollerRef = useRef<EnhancedMomentumScroller | null>(null);
+  
+  // Background tracking
+  const sceneManagerRef = useRef<SceneManager | null>(null);
+  const currentAgentRef = useRef(0);
 
   // Initialize GSAP
   useGSAP();
@@ -62,6 +58,7 @@ export default function DottedPath() {
     const sceneManager = new SceneManager();
     const scene = sceneManager.createScene();
     sceneRef.current = scene;
+    sceneManagerRef.current = sceneManager;
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(
@@ -106,14 +103,6 @@ export default function DottedPath() {
     cardsGroupRef.current = cardsGroup;
     textGroupRef.current = textGroup;
 
-    // Initialize animation manager
-    const animationManager = new AnimationManager(
-      dotsArrayRef,
-      textMeshesRef,
-      positionRef,
-      cameraRef
-    );
-
     // Initialize path renderer
     const pathRenderer = new PathRenderer(
       dotsGroupRef,
@@ -124,16 +113,43 @@ export default function DottedPath() {
       positionRef,
       cameraRef
     );
-
-    // Create initial path
+    pathRendererRef.current = pathRenderer;
+    pathRenderer.initializeFloatingText(scene);
     pathRenderer.createDottedPath();
+
+    // Initialize animation manager
+    const animationManager = new AnimationManager(
+      dotsArrayRef,
+      textMeshesRef,
+      positionRef,
+      cameraRef
+    );
+    animationManagerRef.current = animationManager;
+    animationManager.setPathRenderer(pathRendererRef);
+
+    // Initialize enhanced momentum scroller
+    const momentumScroller = new EnhancedMomentumScroller(
+      positionRef,
+      pathRendererRef,
+      sceneManagerRef,
+      currentAgentRef,
+      animationManagerRef
+    );
+    momentumScrollerRef.current = momentumScroller;
 
     // Render loop
     const animate = () => {
       if (controlsRef.current) {
         controlsRef.current.update();
       }
+      
       animationManager.animate();
+      
+      // Update momentum scroller
+      if (momentumScrollerRef.current) {
+        momentumScrollerRef.current.update();
+      }
+      
       renderer.render(scene, camera);
       animationIdRef.current = requestAnimationFrame(animate);
     };
@@ -150,64 +166,37 @@ export default function DottedPath() {
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (controlsRef.current && controlsRef.current.dispose) {
+      
+      if (window.gsap) {
+        window.gsap.killTweensOf(positionRef);
+      }
+      
+      if (controlsRef.current?.dispose) {
         controlsRef.current.dispose();
+      }
+      
+      if (pathRendererRef.current) {
+        pathRendererRef.current.dispose();
+      }
+      
+      if (sceneManagerRef.current) {
+        sceneManagerRef.current.dispose();
+      }
+      
+      if (momentumScrollerRef.current) {
+        momentumScrollerRef.current.dispose();
       }
       
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
+      
       if (containerElement && renderer.domElement) {
         containerElement.removeChild(renderer.domElement);
       }
       renderer.dispose();
     };
   }, []);
-
-  // Snap to agent function
-  const snapToAgent = (direction: number) => {
-    if (isSnappingRef.current || !window.gsap) return;
-    
-    const currentAgent = Math.floor(positionRef.current / 60);
-    let targetAgent: number;
-    
-    if (direction > 0) {
-      targetAgent = currentAgent + 1;
-    } else {
-      targetAgent = Math.max(0, currentAgent - 1);
-    }
-    
-    const targetPosition = targetAgent * 60;
-    targetPositionRef.current = targetPosition;
-    
-    if (targetPosition === positionRef.current) return;
-    
-    isSnappingRef.current = true;
-    
-    window.gsap.to(positionRef, {
-      current: targetPosition,
-      duration: 1.2,
-      ease: "power2.out",
-      onUpdate: () => {
-        // Recreate path on update
-        if (dotsGroupRef.current && cardsGroupRef.current && textGroupRef.current) {
-          const pathRenderer = new PathRenderer(
-            dotsGroupRef,
-            cardsGroupRef,
-            textGroupRef,
-            dotsArrayRef,
-            textMeshesRef,
-            positionRef,
-            cameraRef
-          );
-          pathRenderer.createDottedPath();
-        }
-      },
-      onComplete: () => {
-        isSnappingRef.current = false;
-      }
-    });
-  };
 
   return (
     <div style={{
@@ -217,7 +206,7 @@ export default function DottedPath() {
       height: '100vh',
       overflow: 'hidden',
       fontFamily: 'Arial, sans-serif',
-      background: '#000'
+      background: 'linear-gradient(to bottom, #7EACF1, #F0F0F0)'
     }}>
       <div 
         ref={containerRef}
@@ -226,11 +215,6 @@ export default function DottedPath() {
           width: '100%',
           height: '100%'
         }}
-      />
-      
-      <InputHandler 
-        snapToAgent={snapToAgent}
-        isSnappingRef={isSnappingRef}
       />
       
       <SimpleAudioManager />

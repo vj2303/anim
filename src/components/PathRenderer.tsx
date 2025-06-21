@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { MutableRefObject } from 'react';
 import { TextureManager } from './TextureManager';
 import { AIAgents } from '../constants/AIAgents';
+import { SimpleFloatingText3D } from './FloatingText3D';
+import { ShapeManager } from './ShapeManager';
 
 export class PathRenderer {
   private dotsGroupRef: MutableRefObject<THREE.Group | null>;
@@ -12,6 +14,11 @@ export class PathRenderer {
   private positionRef: MutableRefObject<number>;
   private cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>;
   private textureManager: TextureManager;
+  private floatingText3D: SimpleFloatingText3D;
+  private shapeManager: ShapeManager;
+  
+  // Track milestone text objects like AI agents
+  private milestoneTextMeshes: Map<number, THREE.Group> = new Map();
 
   constructor(
     dotsGroupRef: MutableRefObject<THREE.Group | null>,
@@ -30,9 +37,30 @@ export class PathRenderer {
     this.positionRef = positionRef;
     this.cameraRef = cameraRef;
     this.textureManager = new TextureManager();
+    this.floatingText3D = new SimpleFloatingText3D();
+    this.shapeManager = new ShapeManager(cameraRef);
   }
 
-  // Updated createDottedPath method with increased vertical spacing
+  public initializeFloatingText(scene: THREE.Scene): void {
+    // No longer needed - we'll create milestone texts directly in the scene like AI agents
+  }
+
+  public checkMilestoneText(): void {
+    // This method is no longer needed since we create milestone texts in createDottedPath like AI agents
+  }
+
+  // Simplified floating text position update - milestone texts are handled in createDottedPath like AI agents
+  public updateFloatingTextPosition(): void {
+    // No longer needed since milestone texts are created in the visible range like AI agents
+  }
+
+  // Add cleanup method
+  public dispose(): void {
+    this.milestoneTextMeshes.clear();
+    this.shapeManager.dispose();
+  }
+
+  // Updated createDottedPath method using ShapeManager
   createDottedPath(): void {
     if (!this.dotsGroupRef.current || !this.cardsGroupRef.current || !this.textGroupRef.current) return;
 
@@ -43,10 +71,10 @@ export class PathRenderer {
     this.dotsArrayRef.current = [];
     this.textMeshesRef.current = [];
 
-    const visibleRange = 50;
+    const visibleRange = 30; // REDUCED from 50 for better performance
     
     // Create smaller 2D dot geometry (reduced from 0.4 to 0.2)
-    const dotGeometry = new THREE.CircleGeometry(0.2, 16);
+    const dotGeometry = new THREE.CircleGeometry(0.2, 8); // REDUCED segments from 16 to 8
 
     // Create dots
     for (let i = -visibleRange; i < visibleRange; i++) {
@@ -58,8 +86,8 @@ export class PathRenderer {
       const progress = Math.abs(i) / visibleRange;
       const opacity = Math.max(0.1, 1 - (progress * 0.8));
       
-      // Calculate advanced alternating curve with smooth transitions
-      const curveOffset = this.calculateAdvancedAlternatingCurve(globalRowIndex);
+      // Calculate rounded curve with smooth transitions
+      const curveOffset = this.calculateRoundedCurve(globalRowIndex);
       
       // Create 6 dots per row spread across full screen width
       for (let col = 0; col < 6; col++) {
@@ -98,47 +126,118 @@ export class PathRenderer {
         this.dotsGroupRef.current.add(dot);
       }
 
-      // Add AI agent boxes every 60 dots
-      if (globalRowIndex > 0 && globalRowIndex % 60 === 0) {
-        this.createAgentBox(globalRowIndex, curveOffset, distance);
+      // Add milestone text every 40 dots - using ShapeManager
+      if (globalRowIndex > 0 && globalRowIndex % 40 === 0) {
+        const milestoneText = this.shapeManager.createMilestoneText(globalRowIndex, curveOffset, distance);
+        this.textGroupRef.current.add(milestoneText);
       }
 
-      // Add transition markers at curve change points
-      if (globalRowIndex > 0 && globalRowIndex % 60 === 30) {
-        this.createTransitionMarker(globalRowIndex, curveOffset, distance);
+      // Add AI agent boxes every 60 dots - using ShapeManager
+      if (globalRowIndex > 0 && globalRowIndex % 60 === 0) {
+        const agentBox = this.shapeManager.createAgentBox(globalRowIndex, curveOffset, distance);
+        this.cardsGroupRef.current.add(agentBox);
+      }
+
+      // Add various 3D shapes every 15 dots for more variety - using ShapeManager
+      if (globalRowIndex > 0 && globalRowIndex % 15 === 0 && globalRowIndex % 60 !== 0) {
+        const variousShape = this.shapeManager.createVariousShapes(globalRowIndex, curveOffset, distance);
+        this.cardsGroupRef.current.add(variousShape);
+      }
+
+      // Add smaller decorative shapes every 8 dots - using ShapeManager
+      if (globalRowIndex > 0 && globalRowIndex % 8 === 0 && globalRowIndex % 15 !== 0) {
+        const decorativeShape = this.shapeManager.createDecorativeShapes(globalRowIndex, curveOffset, distance);
+        this.cardsGroupRef.current.add(decorativeShape);
       }
     }
   }
 
-  // Updated calculateAdvancedAlternatingCurve method with enhanced curve for first 2 dots
-  private calculateAdvancedAlternatingCurve(globalRowIndex: number): number {
+  private calculateRoundedCurve(globalRowIndex: number): number {
     // Calculate screen dimensions for proper scaling
     const cameraDistance = 25;
     const fov = 75;
     const screenWidth = 2 * Math.tan((fov * Math.PI / 180) / 2) * cameraDistance;
     
-    // Row 0: Keep straight (no curve)
-    if (globalRowIndex === 0) {
+    // Row 0-1: Keep straight (no curve)
+    if (globalRowIndex <= 1) {
         return 0;
     }
     
-    // Row 1: First curved dot - make it more pronounced
-    if (globalRowIndex === 1) {
-        const enhancedCurve = screenWidth * 0.15; // Strong initial curve
-        const organicVariation = Math.sin(globalRowIndex * 0.1) * (screenWidth * 0.03);
-        return -enhancedCurve + organicVariation; // Start curving left
+    // Rows 2-40: Create smooth circular curved pattern
+    if (globalRowIndex >= 2 && globalRowIndex <= 40) {
+        const curveStartRow = 2;
+        const curveEndRow = 40;
+        const totalCurveRows = curveEndRow - curveStartRow + 1;
+        
+        // Calculate progress through the curve (0 to 1)
+        const curveProgress = (globalRowIndex - curveStartRow) / (totalCurveRows - 1);
+        
+        // Create a circular arc - simulate traveling along a large circle's circumference
+        const circleAngle = curveProgress * (Math.PI / 2); // 0 to 90 degrees
+        
+        // Define the radius of the virtual circle we're following
+        const circleRadius = screenWidth * 0.8; // Large radius for gentle curve
+        
+        // Calculate position on the circle
+        const circleX = Math.sin(circleAngle) * circleRadius;
+        
+        // Center the curve and scale appropriately
+        const maxOffset = screenWidth * 0.35;
+        const curveOffset = (circleX / circleRadius) * maxOffset;
+        
+        // Apply smooth easing for more natural feel
+        const easedProgress = this.smoothStep(curveProgress);
+        const smoothCurveOffset = curveOffset * easedProgress;
+        
+        // Add gentle secondary curve for more organic feel
+        const secondaryRadius = screenWidth * 0.15;
+        const secondaryAngle = curveProgress * Math.PI;
+        const secondaryOffset = Math.sin(secondaryAngle) * secondaryRadius * 0.2;
+        
+        // Combine primary circular curve with subtle secondary wave
+        const finalOffset = smoothCurveOffset + secondaryOffset;
+        
+        // REDUCED organic variation for smoother movement
+        const organicVariation = Math.sin(globalRowIndex * 0.02) * (screenWidth * 0.003) +
+                                Math.cos(globalRowIndex * 0.015) * (screenWidth * 0.002);
+        
+        // Progressive intensity
+        const progressiveMultiplier = 0.7 + (curveProgress * 0.3);
+        
+        return (finalOffset * progressiveMultiplier) + organicVariation;
     }
     
-    // Row 2: Second curved dot - continue the pronounced curve
-    if (globalRowIndex === 2) {
-        const enhancedCurve = screenWidth * 0.25; // Even stronger curve
-        const organicVariation = Math.sin(globalRowIndex * 0.1) * (screenWidth * 0.03);
-        return -enhancedCurve + organicVariation; // Continue curving left
-    }
-    
-    // Handle curved sections in groups of 80 dots each (starting from row 3)
+    // After row 40: IMPROVED smooth alternating curve pattern
     const sectionSize = 80;
-    const adjustedIndex = globalRowIndex - 3; // Start counting from row 3 (after the first 2 enhanced dots)
+    const adjustedIndex = globalRowIndex - 41;
+    
+    // IMPROVED transition from rounded curve to alternating pattern
+    if (adjustedIndex < 20) { // Extended transition zone
+        const transitionProgress = adjustedIndex / 20; // Smoother transition
+        const smoothTransition = this.smoothStep(transitionProgress);
+        
+        // Start from the end of the rounded curve
+        const roundedEndOffset = screenWidth * 0.25; // Reduced for smoother transition
+        
+        // Calculate where the alternating pattern would start
+        const sectionNumber = Math.floor(adjustedIndex / sectionSize);
+        const positionInSection = adjustedIndex % sectionSize;
+        const progress = positionInSection / (sectionSize - 1);
+        const isLeftToRight = sectionNumber % 2 === 0;
+        
+        const curveRange = screenWidth * 0.2; // Reduced range for smoother movement
+        let alternatingOffset: number;
+        if (isLeftToRight) {
+            alternatingOffset = -curveRange + (2 * curveRange) * this.smoothStep(progress);
+        } else {
+            alternatingOffset = curveRange - (2 * curveRange) * this.smoothStep(progress);
+        }
+        
+        // Smooth transition from rounded curve end to alternating pattern
+        return roundedEndOffset + (alternatingOffset - roundedEndOffset) * smoothTransition;
+    }
+    
+    // Regular alternating curve pattern - IMPROVED smoothing
     const sectionNumber = Math.floor(adjustedIndex / sectionSize);
     const positionInSection = adjustedIndex % sectionSize;
     
@@ -146,27 +245,25 @@ export class PathRenderer {
     const progress = positionInSection / (sectionSize - 1);
     
     // Determine curve direction based on section number
-    const isLeftToRight = sectionNumber % 2 === 0; // Even sections: left-to-right, Odd sections: right-to-left
+    const isLeftToRight = sectionNumber % 2 === 0;
     
-    // Create pronounced curve using sine function
-    const curveIntensity = 1.5;
-    const curvedProgress = Math.sin(progress * Math.PI * curveIntensity) / Math.sin(Math.PI * curveIntensity);
+    // IMPROVED: Smoother curve using enhanced sine function
+    const curveIntensity = 1.2; // Reduced intensity for smoother movement
+    const curvedProgress = this.smoothStep(progress); // Apply smooth step to progress
     
     // Define centered curve range
-    const curveRange = screenWidth * 0.25;
+    const curveRange = screenWidth * 0.2; // Reduced range
     
     // Calculate the main curved path based on direction, centered around 0
     let xPosition: number;
     if (isLeftToRight) {
-        // Left to right curve: start at -curveRange, end at +curveRange
         xPosition = -curveRange + (2 * curveRange) * curvedProgress;
     } else {
-        // Right to left curve: start at +curveRange, end at -curveRange
         xPosition = curveRange - (2 * curveRange) * curvedProgress;
     }
     
-    // Add additional curvature using sine wave overlay (centered)
-    const additionalCurveAmount = screenWidth * 0.08;
+    // REDUCED additional curvature for smoother movement
+    const additionalCurveAmount = screenWidth * 0.04; // Reduced
     const additionalCurve = Math.sin(progress * Math.PI) * additionalCurveAmount;
     if (isLeftToRight) {
         xPosition += additionalCurve;
@@ -174,8 +271,8 @@ export class PathRenderer {
         xPosition -= additionalCurve;
     }
     
-    // Add vertical influence to create more pronounced horizontal curve (centered)
-    const verticalInfluenceAmount = screenWidth * 0.04;
+    // REDUCED vertical influence for smoother movement
+    const verticalInfluenceAmount = screenWidth * 0.02; // Reduced
     const verticalInfluence = Math.cos(progress * Math.PI * 2) * verticalInfluenceAmount;
     if (isLeftToRight) {
         xPosition += verticalInfluence;
@@ -183,67 +280,12 @@ export class PathRenderer {
         xPosition -= verticalInfluence;
     }
     
-    // Add organic variation for natural feel (smaller amounts)
-    const organicVariation = Math.sin(globalRowIndex * 0.03) * (screenWidth * 0.01) +
-                            Math.cos(globalRowIndex * 0.07) * (screenWidth * 0.008);
+    // REDUCED organic variation for ultra-smooth movement
+    const organicVariation = Math.sin(globalRowIndex * 0.015) * (screenWidth * 0.005) +
+                            Math.cos(globalRowIndex * 0.035) * (screenWidth * 0.003);
     
-    // Handle section transitions for smooth continuity
-    const transitionZone = 5;
-    let transitionMultiplier = 1;
-    
-    // Smooth transition at the beginning of each section (except the first)
-    if (sectionNumber > 0 && positionInSection < transitionZone) {
-        const t = positionInSection / transitionZone;
-        transitionMultiplier = this.smoothStep(t);
-        
-        // Calculate the end position of the previous section for smooth transition
-        const prevSectionIsLeftToRight = (sectionNumber - 1) % 2 === 0;
-        const prevSectionEndProgress = 1.0;
-        const prevCurvedProgress = Math.sin(prevSectionEndProgress * Math.PI * curveIntensity) / Math.sin(Math.PI * curveIntensity);
-        
-        let prevSectionEndX: number;
-        if (prevSectionIsLeftToRight) {
-            prevSectionEndX = -curveRange + (2 * curveRange) * prevCurvedProgress;
-            prevSectionEndX += Math.sin(prevSectionEndProgress * Math.PI) * additionalCurveAmount;
-            prevSectionEndX += Math.cos(prevSectionEndProgress * Math.PI * 2) * verticalInfluenceAmount;
-        } else {
-            prevSectionEndX = curveRange - (2 * curveRange) * prevCurvedProgress;
-            prevSectionEndX -= Math.sin(prevSectionEndProgress * Math.PI) * additionalCurveAmount;
-            prevSectionEndX -= Math.cos(prevSectionEndProgress * Math.PI * 2) * verticalInfluenceAmount;
-        }
-        
-        // Blend between previous section end and current section start
-        const currentSectionStartProgress = 0.0;
-        const currentCurvedProgress = Math.sin(currentSectionStartProgress * Math.PI * curveIntensity) / Math.sin(Math.PI * curveIntensity);
-        
-        let currentSectionStartX: number;
-        if (isLeftToRight) {
-            currentSectionStartX = -curveRange + (2 * curveRange) * currentCurvedProgress;
-        } else {
-            currentSectionStartX = curveRange - (2 * curveRange) * currentCurvedProgress;
-        }
-        
-        // Interpolate for smooth transition
-        const blendedStart = prevSectionEndX + (currentSectionStartX - prevSectionEndX) * transitionMultiplier;
-        xPosition = blendedStart + (xPosition - currentSectionStartX) * transitionMultiplier;
-    }
-    
-    // Handle smooth transition from the enhanced second dot to the regular curve pattern
-    if (sectionNumber === 0 && positionInSection < transitionZone) {
-        const t = positionInSection / transitionZone;
-        const smoothT = this.smoothStep(t);
-        
-        // The enhanced second dot position
-        const secondDotPosition = -screenWidth * 0.25;
-        
-        // Blend from second dot position to regular curve start
-        const regularCurveStart = -curveRange;
-        const blendedStart = secondDotPosition + (regularCurveStart - secondDotPosition) * smoothT;
-        xPosition = blendedStart + (xPosition - regularCurveStart) * smoothT;
-    }
-    
-    // Ensure the final position stays centered by clamping extreme values
-    const maxOffset = screenWidth * 0.35;
+    // Ensure the final position stays centered
+    const maxOffset = screenWidth * 0.3; // Reduced max offset
     xPosition = Math.max(-maxOffset, Math.min(maxOffset, xPosition));
     
     return xPosition + organicVariation;
@@ -304,31 +346,8 @@ export class PathRenderer {
   }
 
   private getDotColor(globalRowIndex: number, curveOffset: number): number {
-    // Color dots based on their curve position and agent section
-    const agentSection = Math.floor(globalRowIndex / 60);
-    const normalizedCurve = Math.abs(curveOffset) / 15; // Normalize curve offset
-    
-    // Base colors for different sections
-    const sectionColors = [
-      0x4ade80, // Green
-      0x3b82f6, // Blue  
-      0xf59e0b, // Orange
-      0xef4444, // Red
-      0x8b5cf6, // Purple
-      0x06b6d4, // Cyan
-      0xf97316, // Orange-red
-      0x10b981  // Emerald
-    ];
-    
-    const baseColor = sectionColors[agentSection % sectionColors.length];
-    
-    // Interpolate with white based on curve position for visual effect
-    const intensity = 0.7 + (normalizedCurve * 0.3);
-    const r = ((baseColor >> 16) & 255) / 255 * intensity;
-    const g = ((baseColor >> 8) & 255) / 255 * intensity;
-    const b = (baseColor & 255) / 255 * intensity;
-    
-    return new THREE.Color(r, g, b).getHex();
+    // Return black color for all dots
+    return 0x000000;
   }
 
   private createTransitionMarker(globalRowIndex: number, curveOffset: number, distance: number): void {
@@ -356,128 +375,5 @@ export class PathRenderer {
     marker.position.y += Math.sin(time + globalRowIndex) * 0.5;
     
     this.dotsGroupRef.current?.add(marker);
-  }
-
-  private createAgentBox(globalRowIndex: number, curveOffset: number, distance: number): void {
-    // Get AI agent name based on milestone number
-    const agentIndex = (Math.floor(globalRowIndex / 60) - 1) % AIAgents.length;
-    const agentName = AIAgents[agentIndex];
-    
-    // Create 3D box geometry - make it larger for better visibility
-    const boxGeometry = new THREE.BoxGeometry(8, 5, 3);
-    
-    // Create texture for the box with section indicator
-    const texture = this.textureManager.createBoxTexture(agentName, agentIndex);
-    
-    // Create materials for each face
-    const gradientColors = this.textureManager.getGradientColors();
-    const colorIndex = agentIndex % gradientColors.length;
-    
-    // Calculate circular position data for better visual indicators
-    const totalAgents = 20;
-    const agentSection = Math.floor(globalRowIndex / 60) - 1;
-    const anglePerAgent = (2 * Math.PI) / totalAgents;
-    const currentAngle = agentSection * anglePerAgent;
-    
-    // Determine direction of movement around the circle
-    const nextAngle = ((agentSection + 1) % totalAgents) * anglePerAgent;
-    let isClockwise = true;
-    
-    // Handle wrap-around case
-    if (agentSection === totalAgents - 1) {
-      isClockwise = nextAngle < currentAngle;
-    } else {
-      isClockwise = nextAngle > currentAngle;
-    }
-    
-    const directionColor = isClockwise ? 0x00ff88 : 0xff8800;
-    
-    const materials = [
-      new THREE.MeshLambertMaterial({ map: texture }), // Right
-      new THREE.MeshLambertMaterial({ map: texture }), // Left
-      new THREE.MeshLambertMaterial({ color: directionColor }), // Top - shows direction
-      new THREE.MeshLambertMaterial({ color: gradientColors[colorIndex][0] }), // Bottom
-      new THREE.MeshLambertMaterial({ map: texture }), // Front
-      new THREE.MeshLambertMaterial({ map: texture })  // Back
-    ];
-    
-    const box = new THREE.Mesh(boxGeometry, materials);
-    box.castShadow = true;
-    box.receiveShadow = true;
-    
-    // Position box high above dots with curve offset
-    // Optionally add circular elevation
-    const baseY = 22;
-    const circularElevation = this.calculateCircularElevation(globalRowIndex);
-    box.position.set(curveOffset, baseY + circularElevation, -distance);
-    
-    // Add floating animation with circular motion influence
-    const time = Date.now() * 0.001;
-    box.position.y += Math.sin(time * 0.5 + globalRowIndex) * 0.6;
-    
-    // Rotate based on circular position and direction
-    const rotationOffset = currentAngle * 0.3; // Subtle rotation based on circle position
-    box.rotation.y = Math.sin(time * 0.3 + globalRowIndex) * 0.15 + rotationOffset;
-    box.rotation.x = Math.sin(time * 0.2 + globalRowIndex) * 0.08;
-    
-    // Make the box face slightly toward the center of the circle
-    const facingAngle = currentAngle + Math.PI; // Face inward
-    box.rotation.y += facingAngle * 0.1; // Subtle inward facing
-    
-    this.cardsGroupRef.current?.add(box);
-  
-    // Create floating text with circular direction indicator
-    this.createFloatingText(agentName, globalRowIndex, curveOffset, distance, isClockwise, currentAngle);
-  }
-  
-  // Updated createFloatingText to handle circular path
-  private createFloatingText(
-    agentName: string, 
-    globalRowIndex: number, 
-    curveOffset: number, 
-    distance: number, 
-    isClockwise: boolean, 
-    currentAngle: number
-  ): void {
-    const textGeometry = new THREE.PlaneGeometry(14, 3.5);
-    const currentAgent = Math.floor(this.positionRef.current / 60);
-    const isActive = Math.floor(globalRowIndex / 60) - 1 === currentAgent;
-    
-    // Add circular direction indicator to text
-    const directionIcon = isClockwise ? "↻" : "↺"; // Circular arrows
-    const displayText = `${directionIcon} ${agentName}`;
-    
-    const textTexture = this.textureManager.createTextTexture(displayText, isActive);
-    const textMaterial = new THREE.MeshBasicMaterial({
-      map: textTexture,
-      transparent: true,
-      opacity: 1,
-      alphaTest: 0.1
-    });
-    
-    const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-    
-    // Position text in front of the card with circular elevation
-    const textBaseY = 27;
-    const circularElevation = this.calculateCircularElevation(globalRowIndex);
-    textMesh.position.set(curveOffset, textBaseY + circularElevation, -distance + 10);
-    
-    // Store data for animation
-    textMesh.userData = {
-      text: displayText,
-      baseY: textBaseY,
-      isActive: isActive,
-      isClockwise: isClockwise,
-      circleAngle: currentAngle
-    };
-    
-    // Make text face the camera with slight angle based on circular position
-    if (this.cameraRef.current) {
-      textMesh.lookAt(this.cameraRef.current.position);
-      textMesh.rotation.z += Math.sin(currentAngle) * 0.1; // Slight tilt based on circle position
-    }
-    
-    this.textGroupRef.current?.add(textMesh);
-    this.textMeshesRef.current[Math.floor(globalRowIndex / 60) - 1] = textMesh;
   }
 }

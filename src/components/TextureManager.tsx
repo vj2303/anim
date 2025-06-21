@@ -5,14 +5,14 @@ export class TextureManager {
 
   constructor() {
     this.gradientColors = [
-      ['#667eea', '#764ba2'], // Purple-blue
-      ['#f093fb', '#f5576c'], // Pink-red
-      ['#4facfe', '#00f2fe'], // Blue-cyan
-      ['#43e97b', '#38f9d7'], // Green-cyan
-      ['#fa709a', '#fee140'], // Pink-yellow
-      ['#a8edea', '#fed6e3'], // Mint-pink
-      ['#ffecd2', '#fcb69f'], // Peach
-      ['#ff9a9e', '#fecfef'], // Rose
+      ['#ff006e', '#ff6b35'], // Bright pink to orange
+      ['#00ff88', '#00d4ff'], // Bright green to cyan
+      ['#ff00ff', '#ffff00'], // Magenta to yellow
+      ['#00ffff', '#ff0080'], // Cyan to hot pink
+      ['#ff8800', '#ff0088'], // Bright orange to pink
+      ['#8800ff', '#00ff88'], // Purple to green
+      ['#ff0080', '#8000ff'], // Hot pink to purple
+      ['#00ff00', '#ff0000'], // Bright green to red
     ];
   }
 
@@ -20,6 +20,7 @@ export class TextureManager {
     return this.gradientColors;
   }
 
+  // Updated method - NO GLASSMORPHISM, clean and simple text
   createTextTexture(text: string, isActive: boolean = false): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -30,64 +31,37 @@ export class TextureManager {
       throw new Error('Failed to get 2D canvas context');
     }
     
-    // Clear canvas
+    // Clear canvas with transparent background
     ctx.clearRect(0, 0, 512, 128);
     
-    if (isActive) {
-      // Glassmorphism background for active state
-      const gradient = ctx.createLinearGradient(0, 0, 512, 128);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
-      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.15)');
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
-      ctx.fillStyle = gradient;
-      
-      // Rounded rectangle
-      const radius = 20;
-      ctx.beginPath();
-      ctx.moveTo(radius, 0);
-      ctx.lineTo(512 - radius, 0);
-      ctx.quadraticCurveTo(512, 0, 512, radius);
-      ctx.lineTo(512, 128 - radius);
-      ctx.quadraticCurveTo(512, 128, 512 - radius, 128);
-      ctx.lineTo(radius, 128);
-      ctx.quadraticCurveTo(0, 128, 0, 128 - radius);
-      ctx.lineTo(0, radius);
-      ctx.quadraticCurveTo(0, 0, radius, 0);
-      ctx.closePath();
-      ctx.fill();
-      
-      // Border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Inner glow
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    }
+    // NO background shapes or glassmorphism effects - just text
     
-    // Text styling
-    ctx.font = isActive ? 'bold 32px Arial' : 'bold 28px Arial';
-    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.7)';
+    // Text styling - clean and readable
+    const fontSize = isActive ? 36 : 32;
+    const fontWeight = isActive ? 'bold' : 'normal';
+    ctx.font = `${fontWeight} ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Text shadow for better readability
-    if (!isActive) {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-      ctx.shadowBlur = 6;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-    }
+    // Add text shadow for better readability against any background
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
     
-    // Draw text
+    // Set text color based on active state
+    ctx.fillStyle = isActive ? '#ffffff' : '#e5e7eb';
+    
+    // Draw the text
     ctx.fillText(text, 256, 64);
     
-    return new THREE.CanvasTexture(canvas);
+    // Create and return texture
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
   }
 
+  // Keep the box texture method unchanged for the 3D boxes
   createBoxTexture(agentName: string, agentIndex: number): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -135,6 +109,8 @@ export class TextureManager {
       ctx.fillText(agentName, 256, 160);
     }
     
-    return new THREE.CanvasTexture(canvas);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
   }
 }
