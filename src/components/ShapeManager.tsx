@@ -323,77 +323,111 @@ export class ShapeManager {
     return textGroup;
   }
 
-  // Create AI agent box
-  public createAgentBox(globalRowIndex: number, curveOffset: number, distance: number): THREE.Mesh {
+  // Create AI agent text display
+  public createAgentBox(globalRowIndex: number, curveOffset: number, distance: number): THREE.Group {
     // Get AI agent name based on milestone number
     const agentIndex = (Math.floor(globalRowIndex / 60) - 1) % AIAgents.length;
     const agentName = AIAgents[agentIndex];
     
-    // INCREASED AI agent box size for better prominence
-    const boxGeometry = new THREE.BoxGeometry(10, 7, 4.5); // INCREASED from 6, 4, 2.5
+    // Create a group to hold the agent text
+    const agentGroup = new THREE.Group();
     
-    // Create texture for the box with section indicator
-    const texture = this.textureManager.createBoxTexture(agentName, agentIndex);
-    
-    // Create materials for each face with BRIGHT, VIBRANT colors
-    const gradientColors = this.textureManager.getGradientColors();
-    const colorIndex = agentIndex % gradientColors.length;
-    
-    // BRIGHT direction colors
-    const agentSection = Math.floor(globalRowIndex / 60) - 1;
-    const isClockwise = agentSection % 2 === 0;
-    const directionColor = isClockwise ? 0x00ff00 : 0xff00ff; // Bright green or magenta
-    
-    // BRIGHT face colors
-    const brightColors = [
-      0xff006e, // Bright pink
-      0x00ff88, // Bright green
-      0xff00ff, // Magenta
-      0x00ffff, // Cyan
-      0xff8800, // Bright orange
-      0x8800ff, // Purple
-      0xff0080, // Hot pink
-      0x00ff00, // Bright green
-    ];
-    
-    const faceColor = brightColors[agentIndex % brightColors.length];
-    
-    const materials = [
-      new THREE.MeshLambertMaterial({ color: faceColor }), // Right - bright color
-      new THREE.MeshLambertMaterial({ color: faceColor }), // Left - bright color
-      new THREE.MeshLambertMaterial({ color: directionColor }), // Top - shows direction
-      new THREE.MeshLambertMaterial({ color: 0xffff00 }), // Bottom - bright yellow
-      new THREE.MeshLambertMaterial({ map: texture }), // Front - texture
-      new THREE.MeshLambertMaterial({ color: faceColor })  // Back - bright color
-    ];
-    
-    const box = new THREE.Mesh(boxGeometry, materials);
-    box.castShadow = true;
-    box.receiveShadow = true;
-    
-    // Add click interaction data
-    box.userData = {
+    // Add click interaction data to the group
+    agentGroup.userData = {
       isClickable: true,
       shapeType: 'ai_agent',
       shapeName: agentName,
       agentIndex: agentIndex,
-      globalRowIndex: globalRowIndex,
-      isClockwise: isClockwise
+      globalRowIndex: globalRowIndex
     };
     
-    // INCREASED base height for better visibility
-    const baseY = 24; // INCREASED from 20 to 24
-    box.position.set(curveOffset, baseY, -distance);
+    // Create large, bold text for the agent name
+    const agentTextMesh = this.createAgentTextMesh(agentName, agentIndex);
+    
+    // Add click data to the text mesh
+    agentTextMesh.userData = {
+      isClickable: true,
+      shapeType: 'ai_agent_text',
+      shapeName: agentName,
+      agentIndex: agentIndex,
+      globalRowIndex: globalRowIndex
+    };
+    
+    agentGroup.add(agentTextMesh);
+    
+    // Calculate left-right positioning for AI agent text
+    const cameraDistance = 25;
+    const fov = 75;
+    const screenWidth = 2 * Math.tan((fov * Math.PI / 180) / 2) * cameraDistance;
+    
+    // Alternate between left and right sides based on agent index
+    const isLeftSide = agentIndex % 2 === 0;
+    const xOffset = isLeftSide ? -screenWidth * 0.25 : screenWidth * 0.25;
+    const baseY = 24; // High position for visibility
+    
+    agentGroup.position.set(curveOffset + xOffset, baseY, -distance);
     
     // Enhanced animation with larger floating range
     const time = Date.now() * 0.001;
-    const simpleFloat = Math.sin(time * 0.3 + globalRowIndex * 0.1) * 0.8; // INCREASED from 0.4 to 0.8
-    box.position.y += simpleFloat;
+    const simpleFloat = Math.sin(time * 0.3 + globalRowIndex * 0.1) * 0.8;
+    agentGroup.position.y += simpleFloat;
     
-    // Enhanced rotation
-    box.rotation.y = Math.sin(time * 0.2 + globalRowIndex * 0.05) * 0.15; // INCREASED from 0.1 to 0.15
+    // Gentle rotation for dynamic feel
+    agentGroup.rotation.y = Math.sin(time * 0.2 + globalRowIndex * 0.05) * 0.1;
     
-    return box;
+    return agentGroup;
+  }
+
+  // Create large, bold text mesh for AI agent names
+  private createAgentTextMesh(agentName: string, agentIndex: number): THREE.Mesh {
+    // Create plane geometry for text - larger size for bold effect
+    const textGeometry = new THREE.PlaneGeometry(16, 4); // Increased size for bold text
+    
+    // Create canvas for text texture
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    canvas.width = 1024; // Higher resolution for crisp text
+    canvas.height = 256;
+
+    // Clear canvas with transparent background
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Set text properties for large, bold text
+    const fontSize = 72; // Large font size
+    const fontWeight = 'bold';
+    
+    // Get text color (white for contrast)
+    const textColor = '#ffffff';
+
+    // Draw text with bold effect
+    context.fillStyle = textColor;
+    context.font = `${fontWeight} ${fontSize}px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Add text shadow for bold effect
+    context.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    context.shadowBlur = 8;
+    context.shadowOffsetX = 4;
+    context.shadowOffsetY = 4;
+    
+    // Draw the agent name
+    context.fillText(agentName, canvas.width / 2, canvas.height / 2);
+
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    // Create material with texture - transparent background
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 1.0,
+      side: THREE.DoubleSide,
+      alphaTest: 0.1
+    });
+
+    return new THREE.Mesh(textGeometry, material);
   }
 
   // Create individual text mesh - SIMPLIFIED without glassmorphism
@@ -501,7 +535,7 @@ export class ShapeManager {
   }
 
   private getMainShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // Create patterns for main shapes positioning
+    // Create alternating left-right pattern for main shapes
     const positionIndex = Math.floor(globalRowIndex / 15) % 8; // 8 different position patterns
     
     let xOffset = 0;
@@ -509,42 +543,41 @@ export class ShapeManager {
     
     switch (positionIndex) {
       case 0: // Left side of path
-        xOffset = curveOffset - screenWidth * 0.15;
+        xOffset = curveOffset - screenWidth * 0.2;
         yOffset = 10;
         break;
       case 1: // Right side of path
-        xOffset = curveOffset + screenWidth * 0.15;
+        xOffset = curveOffset + screenWidth * 0.2;
         yOffset = 14;
         break;
       case 2: // Far left
-        xOffset = curveOffset - screenWidth * 0.25;
+        xOffset = curveOffset - screenWidth * 0.35;
         yOffset = 8;
         break;
       case 3: // Far right
-        xOffset = curveOffset + screenWidth * 0.25;
+        xOffset = curveOffset + screenWidth * 0.35;
         yOffset = 16;
         break;
-      case 4: // Slightly left, higher
-        xOffset = curveOffset - screenWidth * 0.08;
+      case 4: // Medium left, elevated
+        xOffset = curveOffset - screenWidth * 0.15;
         yOffset = 18;
         break;
-      case 5: // Slightly right, lower
-        xOffset = curveOffset + screenWidth * 0.08;
+      case 5: // Medium right, elevated
+        xOffset = curveOffset + screenWidth * 0.15;
+        yOffset = 20;
+        break;
+      case 6: // Very far left
+        xOffset = curveOffset - screenWidth * 0.45;
         yOffset = 6;
         break;
-      case 6: // Center path (original position)
-        xOffset = curveOffset;
-        yOffset = 12;
-        break;
-      case 7: // Alternating sides with height variation
-        const isLeft = globalRowIndex % 30 < 15;
-        xOffset = curveOffset + (isLeft ? -screenWidth * 0.2 : screenWidth * 0.2);
-        yOffset = isLeft ? 15 : 9;
+      case 7: // Very far right
+        xOffset = curveOffset + screenWidth * 0.45;
+        yOffset = 22;
         break;
     }
     
     // Add some organic variation
-    const organicX = Math.sin(globalRowIndex * 0.1) * (screenWidth * 0.03);
+    const organicX = Math.sin(globalRowIndex * 0.1) * (screenWidth * 0.02);
     const organicY = Math.cos(globalRowIndex * 0.08) * 2;
     
     return {
@@ -554,66 +587,57 @@ export class ShapeManager {
   }
 
   private getDecorativeShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // More varied positioning for decorative shapes
-    const positionIndex = globalRowIndex % 12; // 12 different decorative patterns
+    // Left-right distribution for decorative shapes
+    const positionIndex = globalRowIndex % 10; // 10 different decorative patterns
     
     let xOffset = 0;
     let yOffset = 6; // Lower base height
     
     switch (positionIndex) {
       case 0: // Close left
-        xOffset = curveOffset - screenWidth * 0.1;
+        xOffset = curveOffset - screenWidth * 0.12;
         yOffset = 4;
         break;
       case 1: // Close right
-        xOffset = curveOffset + screenWidth * 0.1;
+        xOffset = curveOffset + screenWidth * 0.12;
         yOffset = 8;
         break;
       case 2: // Medium left
-        xOffset = curveOffset - screenWidth * 0.18;
+        xOffset = curveOffset - screenWidth * 0.25;
         yOffset = 6;
         break;
       case 3: // Medium right
-        xOffset = curveOffset + screenWidth * 0.18;
+        xOffset = curveOffset + screenWidth * 0.25;
         yOffset = 10;
         break;
       case 4: // Far left, low
-        xOffset = curveOffset - screenWidth * 0.3;
+        xOffset = curveOffset - screenWidth * 0.4;
         yOffset = 3;
         break;
       case 5: // Far right, low
-        xOffset = curveOffset + screenWidth * 0.3;
+        xOffset = curveOffset + screenWidth * 0.4;
         yOffset = 3;
         break;
       case 6: // Left side, elevated
-        xOffset = curveOffset - screenWidth * 0.12;
+        xOffset = curveOffset - screenWidth * 0.18;
         yOffset = 12;
         break;
       case 7: // Right side, elevated
-        xOffset = curveOffset + screenWidth * 0.12;
+        xOffset = curveOffset + screenWidth * 0.18;
         yOffset = 12;
         break;
-      case 8: // Scattered left pattern
-        xOffset = curveOffset - screenWidth * (0.05 + Math.sin(globalRowIndex * 0.2) * 0.1);
-        yOffset = 5 + Math.cos(globalRowIndex * 0.15) * 3;
+      case 8: // Very far left, high
+        xOffset = curveOffset - screenWidth * 0.5;
+        yOffset = 15;
         break;
-      case 9: // Scattered right pattern
-        xOffset = curveOffset + screenWidth * (0.05 + Math.cos(globalRowIndex * 0.25) * 0.1);
-        yOffset = 7 + Math.sin(globalRowIndex * 0.18) * 4;
-        break;
-      case 10: // Random near path
-        const randomSide = Math.sin(globalRowIndex * 0.3) > 0 ? 1 : -1;
-        xOffset = curveOffset + randomSide * screenWidth * (0.06 + Math.abs(Math.sin(globalRowIndex * 0.12)) * 0.08);
-        yOffset = 4 + Math.abs(Math.cos(globalRowIndex * 0.09)) * 6;
-        break;
-      case 11: // Floating above path center
-        xOffset = curveOffset + Math.sin(globalRowIndex * 0.4) * screenWidth * 0.05;
-        yOffset = 15 + Math.cos(globalRowIndex * 0.22) * 3;
+      case 9: // Very far right, high
+        xOffset = curveOffset + screenWidth * 0.5;
+        yOffset = 15;
         break;
     }
     
     // Add more random variation for decorative shapes
-    const randomX = (Math.sin(globalRowIndex * 0.33) * 0.5 + Math.cos(globalRowIndex * 0.47) * 0.3) * screenWidth * 0.05;
+    const randomX = (Math.sin(globalRowIndex * 0.33) * 0.5 + Math.cos(globalRowIndex * 0.47) * 0.3) * screenWidth * 0.03;
     const randomY = Math.sin(globalRowIndex * 0.19) * 2;
     
     return {
@@ -623,28 +647,28 @@ export class ShapeManager {
   }
 
   private getMilestoneShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // Special positioning for milestone elements (keep them more visible)
+    // Left-right alternating pattern for milestone elements
     const milestoneIndex = Math.floor(globalRowIndex / 40) % 4;
     
     let xOffset = curveOffset;
     let yOffset = 25; // High base height for visibility
     
     switch (milestoneIndex) {
-      case 0: // Center high
-        xOffset = curveOffset;
+      case 0: // Left side
+        xOffset = curveOffset - screenWidth * 0.15;
+        yOffset = 22;
+        break;
+      case 1: // Right side
+        xOffset = curveOffset + screenWidth * 0.15;
+        yOffset = 22;
+        break;
+      case 2: // Far left
+        xOffset = curveOffset - screenWidth * 0.25;
         yOffset = 25;
         break;
-      case 1: // Left elevated
-        xOffset = curveOffset - screenWidth * 0.1;
-        yOffset = 22;
-        break;
-      case 2: // Right elevated
-        xOffset = curveOffset + screenWidth * 0.1;
-        yOffset = 22;
-        break;
-      case 3: // Center very high
-        xOffset = curveOffset;
-        yOffset = 28;
+      case 3: // Far right
+        xOffset = curveOffset + screenWidth * 0.25;
+        yOffset = 25;
         break;
     }
     

@@ -317,6 +317,12 @@ export class SmoothSectionScroller {
     return targetSection;
   }
   
+  private playTransitionSound(): void {
+    const audio = new Audio('/transition.wav');
+    audio.volume = 0.9;
+    audio.play().catch(() => {}); // Ignore play errors (e.g., user gesture required)
+  }
+  
   private snapToSection(targetPosition: number, duration: number = 1.0): void {
     if (this.isSnapping || targetPosition === this.positionRef.current) return;
     
@@ -359,6 +365,12 @@ export class SmoothSectionScroller {
         }
       }
     });
+    
+    // Find the section type for the target position
+    const section = this.sections.find(s => s.position === targetPosition);
+    if (section && section.type === 'agent') {
+      this.playTransitionSound();
+    }
   }
   
   private getSnapDuration(sectionType: string): number {

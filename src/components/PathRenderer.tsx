@@ -115,9 +115,13 @@ export class PathRenderer {
         
         // Store additional data for enhanced animations
         dot.userData = {
+          isClickable: true,
+          shapeType: 'dot',
+          shapeName: `Dot ${globalRowIndex}-${col}`,
           originalColor: this.getDotColor(globalRowIndex, curveOffset),
           globalRowIndex: globalRowIndex,
-          curveOffset: curveOffset
+          curveOffset: curveOffset,
+          columnIndex: col
         };
         
         // Store dot in array for blinking animation
@@ -132,7 +136,7 @@ export class PathRenderer {
         this.textGroupRef.current.add(milestoneText);
       }
 
-      // Add AI agent boxes every 60 dots - using ShapeManager
+    
       if (globalRowIndex > 0 && globalRowIndex % 60 === 0) {
         const agentBox = this.shapeManager.createAgentBox(globalRowIndex, curveOffset, distance);
         this.cardsGroupRef.current.add(agentBox);
@@ -189,7 +193,7 @@ export class PathRenderer {
         const easedProgress = this.smoothStep(curveProgress);
         const smoothCurveOffset = curveOffset * easedProgress;
         
-        // Add gentle secondary curve for more organic feel
+      
         const secondaryRadius = screenWidth * 0.15;
         const secondaryAngle = curveProgress * Math.PI;
         const secondaryOffset = Math.sin(secondaryAngle) * secondaryRadius * 0.2;

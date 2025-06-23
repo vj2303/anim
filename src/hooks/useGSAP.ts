@@ -8,6 +8,7 @@ declare global {
       fromTo: (target: any, fromVars: any, toVars: any) => any;
       set: (target: any, vars: any) => any;
       killTweensOf: (target: any) => void;
+      timeline: () => any;
     };
   }
 }

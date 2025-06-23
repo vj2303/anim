@@ -67,6 +67,8 @@ export class EnhancedMomentumScroller {
     maxSnapVelocity: 20
   };
   
+  private lastPlayedAgentIndex: number | null = null;
+  
   constructor(
     positionRef: MutableRefObject<number>,
     pathRendererRef: MutableRefObject<any>,
@@ -408,6 +410,12 @@ export class EnhancedMomentumScroller {
     }
   }
   
+  private playTransitionSound(): void {
+    const audio = new Audio('/transition.wav');
+    audio.volume = 0.9;
+    audio.play().catch(() => {}); // Ignore play errors (e.g., user gesture required)
+  }
+  
   private snapToSection(targetSection: ScrollSection): void {
     if (this.isSnapping) return;
     
@@ -450,6 +458,11 @@ export class EnhancedMomentumScroller {
         }
       }
     });
+    
+    // Play sound if snapping to an agent
+    if (targetSection.type === 'agent') {
+      this.playTransitionSound();
+    }
   }
   
   private handleInputEnd(): void {
@@ -481,11 +494,17 @@ export class EnhancedMomentumScroller {
     if (this.pathRendererRef.current) {
       this.pathRendererRef.current.createDottedPath();
     }
-    
     const currentAgent = Math.floor(this.positionRef.current / 60);
     if (currentAgent !== this.currentAgentRef.current && this.sceneManagerRef.current) {
       this.currentAgentRef.current = currentAgent;
       this.sceneManagerRef.current.updateBackgroundForAgent(currentAgent);
+    }
+    // Play transition sound when passing through a new agent section
+    if (currentAgent !== this.lastPlayedAgentIndex) {
+      this.lastPlayedAgentIndex = currentAgent;
+      if (currentAgent > 0) { // Only play for valid agent indices
+        this.playTransitionSound();
+      }
     }
   }
   

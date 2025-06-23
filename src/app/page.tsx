@@ -8,19 +8,13 @@ import { PathRenderer } from '../components/PathRenderer';
 import { AnimationManager } from '../components/AnimationManager';
 import { EnhancedMomentumScroller } from '../components/EnhancedMomentumScroller';
 import { SimpleAudioManager } from '../components/EnhancedAudioManager';
+import { InteractionManager } from '../components/InteractionManager';
+import { AgentNameOverlay } from '../components/AgentNameOverlay';
 import { useGSAP } from '../hooks/useGSAP';
+import SmoothScreenMove from '../components/SmoothScreenMove';
+import Parallax3DSpace from '@/components/Parallax3DSpace';
 
-// Enhanced GSAP types
-declare global {
-  interface Window {
-    gsap?: {
-      to: (target: any, vars: any) => any;
-      killTweensOf: (target: any) => void;
-      timeline: () => any;
-      set: (target: any, vars: any) => void;
-    };
-  }
-}
+
 
 export default function DottedPath() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +36,8 @@ export default function DottedPath() {
   const pathRendererRef = useRef<PathRenderer | null>(null);
   const animationManagerRef = useRef<AnimationManager | null>(null);
   const momentumScrollerRef = useRef<EnhancedMomentumScroller | null>(null);
+  const interactionManagerRef = useRef<InteractionManager | null>(null);
+  const agentNameOverlayRef = useRef<AgentNameOverlay | null>(null);
   
   // Background tracking
   const sceneManagerRef = useRef<SceneManager | null>(null);
@@ -137,6 +133,38 @@ export default function DottedPath() {
     );
     momentumScrollerRef.current = momentumScroller;
 
+    // Initialize interaction manager for 3D object touch/click animations
+    const interactionManager = new InteractionManager(
+      cameraRef,
+      sceneRef,
+      cardsGroupRef,
+      textGroupRef,
+      dotsGroupRef
+    );
+    interactionManagerRef.current = interactionManager;
+
+    // Initialize agent name overlay for front-screen agent name display
+    const agentNameOverlay = new AgentNameOverlay(
+      sceneRef,
+      cameraRef,
+      positionRef,
+      currentAgentRef
+    );
+    agentNameOverlayRef.current = agentNameOverlay;
+    agentNameOverlay.initialize();
+
+    // Add event listeners for 3D object interactions
+    const handlePointerMove = (event: PointerEvent) => {
+      interactionManager.handlePointerMove(event);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      interactionManager.handleTouchMove(event);
+    };
+
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
+    renderer.domElement.addEventListener('touchmove', handleTouchMove, { passive: false });
+
     // Render loop
     const animate = () => {
       if (controlsRef.current) {
@@ -148,6 +176,16 @@ export default function DottedPath() {
       // Update momentum scroller
       if (momentumScrollerRef.current) {
         momentumScrollerRef.current.update();
+      }
+
+      // Update interaction manager
+      if (interactionManagerRef.current) {
+        interactionManagerRef.current.update();
+      }
+
+      // Update agent name overlay
+      if (agentNameOverlayRef.current) {
+        agentNameOverlayRef.current.update();
       }
       
       renderer.render(scene, camera);
@@ -166,6 +204,10 @@ export default function DottedPath() {
     // Cleanup
     return () => {
       window.removeEventListener('resize', handleResize);
+      
+      // Remove interaction event listeners
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+      renderer.domElement.removeEventListener('touchmove', handleTouchMove);
       
       if (window.gsap) {
         window.gsap.killTweensOf(positionRef);
@@ -186,6 +228,14 @@ export default function DottedPath() {
       if (momentumScrollerRef.current) {
         momentumScrollerRef.current.dispose();
       }
+
+      if (interactionManagerRef.current) {
+        interactionManagerRef.current.dispose();
+      }
+      
+      if (agentNameOverlayRef.current) {
+        agentNameOverlayRef.current.dispose();
+      }
       
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
@@ -199,6 +249,7 @@ export default function DottedPath() {
   }, []);
 
   return (
+   
     <div style={{
       margin: 0,
       padding: 0,
@@ -206,8 +257,9 @@ export default function DottedPath() {
       height: '100vh',
       overflow: 'hidden',
       fontFamily: 'Arial, sans-serif',
-      background: 'linear-gradient(to bottom, #7EACF1, #F0F0F0)'
+      background: 'linear-gradient(#ffffff, #ffffff)'
     }}>
+      <Parallax3DSpace maxOffset={20}>
       <div 
         ref={containerRef}
         style={{
@@ -216,8 +268,14 @@ export default function DottedPath() {
           height: '100%'
         }}
       />
+      </Parallax3DSpace>
       
       <SimpleAudioManager />
     </div>
+
+
   );
 }
+
+
+
