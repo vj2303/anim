@@ -7,14 +7,11 @@ import { CameraControls } from '../components/CameraControls';
 import { PathRenderer } from '../components/PathRenderer';
 import { AnimationManager } from '../components/AnimationManager';
 import { EnhancedMomentumScroller } from '../components/EnhancedMomentumScroller';
-import { SimpleAudioManager } from '../components/EnhancedAudioManager';
 import { InteractionManager } from '../components/InteractionManager';
 import { AgentNameOverlay } from '../components/AgentNameOverlay';
 import { useGSAP } from '../hooks/useGSAP';
-import SmoothScreenMove from '../components/SmoothScreenMove';
 import Parallax3DSpace from '@/components/Parallax3DSpace';
-
-
+import SimpleAudioManagerComponent from '@/components/SimpleAudioManager';
 
 export default function DottedPath() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -209,8 +206,10 @@ export default function DottedPath() {
       renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       renderer.domElement.removeEventListener('touchmove', handleTouchMove);
       
-      if (window.gsap) {
-        window.gsap.killTweensOf(positionRef);
+      // Type assertion for GSAP cleanup
+      const windowWithGsap = window as unknown as { gsap?: { killTweensOf: (target: unknown) => void } };
+      if (windowWithGsap.gsap) {
+        windowWithGsap.gsap.killTweensOf(positionRef);
       }
       
       if (controlsRef.current?.dispose) {
@@ -249,7 +248,6 @@ export default function DottedPath() {
   }, []);
 
   return (
-   
     <div style={{
       margin: 0,
       padding: 0,
@@ -260,22 +258,24 @@ export default function DottedPath() {
       background: 'linear-gradient(#ffffff, #ffffff)'
     }}>
       <Parallax3DSpace maxOffset={20}>
-      <div 
-        ref={containerRef}
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%'
-        }}
-      />
+        <div 
+          ref={containerRef}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%'
+          }}
+        />
       </Parallax3DSpace>
       
-      <SimpleAudioManager />
+      {/* Audio Manager for Background Music */}
+      <SimpleAudioManagerComponent 
+        audioSrc="/bg-music.mp3"
+        autoPlay={true}
+        loop={true}
+        volume={0.3}
+        showControls={true}
+      />
     </div>
-
-
   );
 }
-
-
-

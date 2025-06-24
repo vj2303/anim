@@ -51,7 +51,6 @@ export function InputHandler({ positionRef, onScroll, snapToAgent, isSnappingRef
         
         // Optional: Auto-snap to nearest agent after scrolling stops
         if (snapToAgent && !isSnappingRef?.current) {
-          const currentAgent = Math.floor(positionRef.current / 60);
           const positionInAgent = positionRef.current % 60;
           
           // If we're close to an agent boundary, snap to it
@@ -157,7 +156,7 @@ export function InputHandler({ positionRef, onScroll, snapToAgent, isSnappingRef
     }
   }, [onScroll, isSnappingRef]);
 
-  const handleTouchEnd = useCallback((event: TouchEvent): void => {
+  const handleTouchEnd = useCallback((): void => {
     const finalDelta = touchDeltaRef.current;
     touchDeltaRef.current = 0;
     

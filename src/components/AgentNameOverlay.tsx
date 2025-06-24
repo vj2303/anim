@@ -1,6 +1,24 @@
 import * as THREE from 'three';
 import { MutableRefObject } from 'react';
 
+// Type for GSAP timeline
+interface GSAPTimeline {
+  set: (target: unknown, vars: unknown) => GSAPTimeline;
+  to: (target: unknown, vars: unknown, position?: number | string) => GSAPTimeline;
+}
+
+// Type for GSAP object
+interface GSAP {
+  timeline: (options?: {
+    onComplete?: () => void;
+    onStart?: () => void;
+    onUpdate?: () => void;
+    delay?: number;
+    repeat?: number;
+    yoyo?: boolean;
+  }) => GSAPTimeline;
+}
+
 export class AgentNameOverlay {
   private sceneRef: MutableRefObject<THREE.Scene | null>;
   private cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>;
@@ -37,7 +55,6 @@ export class AgentNameOverlay {
   public update(): void {
     if (!this.sceneRef.current || !this.cameraRef.current || !this.overlayGroup) return;
 
-    const currentPosition = this.positionRef.current;
     const currentAgent = this.currentAgentRef.current;
     
     // Check if we've moved to a new agent section
@@ -175,11 +192,15 @@ export class AgentNameOverlay {
 
   // Animate overlay text in
   private animateOverlayIn(): void {
-    if (!this.currentOverlayText || !window.gsap) return;
+    if (!this.currentOverlayText) return;
+    
+    // Type assertion for GSAP
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     this.isAnimating = true;
 
-    const timeline = window.gsap.timeline({
+    const timeline = gsap.timeline({
       onComplete: () => {
         this.isAnimating = false;
         // Auto-hide after 3 seconds
@@ -222,11 +243,15 @@ export class AgentNameOverlay {
 
   // Animate overlay text out
   private animateOverlayOut(): void {
-    if (!this.currentOverlayText || !window.gsap) return;
+    if (!this.currentOverlayText) return;
+    
+    // Type assertion for GSAP
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     this.isAnimating = true;
 
-    const timeline = window.gsap.timeline({
+    const timeline = gsap.timeline({
       onComplete: () => {
         this.isAnimating = false;
         this.removeCurrentOverlay();
@@ -294,4 +319,4 @@ export class AgentNameOverlay {
       this.overlayGroup = null;
     }
   }
-} 
+}

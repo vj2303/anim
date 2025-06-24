@@ -2,6 +2,15 @@ import { TextureManager } from './TextureManager';
 import * as THREE from 'three';
 import { MutableRefObject } from 'react';
 
+// Define PathRenderer interface to match the actual class
+// Using a more flexible approach that doesn't require index signature
+interface PathRendererLike {
+  dispose?(): void;
+  // Add other commonly used methods as they're discovered
+  initializeFloatingText?(scene: unknown): void;
+  createDottedPath?(): void;
+}
+
 export class AnimationManager {
   private dotsArrayRef: MutableRefObject<THREE.Mesh[]>;
   private textMeshesRef: MutableRefObject<THREE.Mesh[]>;
@@ -18,7 +27,7 @@ export class AnimationManager {
   private skipFrames: number = 1; // Reduced skipping for smoother animations
   
   // PathRenderer reference for floating text updates
-  private pathRendererRef: MutableRefObject<any> | null = null;
+  private pathRendererRef: MutableRefObject<PathRendererLike | null> | null = null;
   
   // Animation state tracking
   private lastPosition: number = 0;
@@ -40,7 +49,7 @@ export class AnimationManager {
   }
 
   // Method to set PathRenderer reference for floating text updates
-  setPathRenderer(pathRendererRef: MutableRefObject<any>): void {
+  setPathRenderer(pathRendererRef: MutableRefObject<PathRendererLike | null>): void {
     this.pathRendererRef = pathRendererRef;
   }
 

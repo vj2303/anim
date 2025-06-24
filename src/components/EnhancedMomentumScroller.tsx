@@ -15,12 +15,40 @@ interface ScrollSection {
   snapDuration: number;
 }
 
+// Interface for PathRenderer-like objects
+interface PathRendererLike {
+  createDottedPath?(): void;
+  dispose?(): void;
+}
+
+// Interface for SceneManager-like objects
+interface SceneManagerLike {
+  updateBackgroundForAgent?(agentIndex: number): void;
+  dispose?(): void;
+}
+
+// Interface for AnimationManager-like objects
+interface AnimationManagerLike {
+  optimizeForGSAPAnimation?(isAnimating: boolean): void;
+  dispose?(): void;
+}
+
+// Interface for GSAP tween
+interface GSAPTween {
+  kill(): void;
+}
+
+// Interface for GSAP
+interface GSAP {
+  to: (target: unknown, vars: unknown) => GSAPTween;
+}
+
 export class EnhancedMomentumScroller {
   private positionRef: MutableRefObject<number>;
-  private pathRendererRef: MutableRefObject<any>;
-  private sceneManagerRef: MutableRefObject<any>;
+  private pathRendererRef: MutableRefObject<PathRendererLike | null>;
+  private sceneManagerRef: MutableRefObject<SceneManagerLike | null>;
   private currentAgentRef: MutableRefObject<number>;
-  private animationManagerRef: MutableRefObject<any>;
+  private animationManagerRef: MutableRefObject<AnimationManagerLike | null>;
   
   // Momentum physics
   private velocity: number = 0;
@@ -55,8 +83,8 @@ export class EnhancedMomentumScroller {
   };
   
   // GSAP references
-  private currentTween: any = null;
-  private momentumTween: any = null;
+  private currentTween: GSAPTween | null = null;
+  private momentumTween: GSAPTween | null = null;
   
   // Configuration
   private config: MomentumScrollerConfig = {
@@ -69,12 +97,15 @@ export class EnhancedMomentumScroller {
   
   private lastPlayedAgentIndex: number | null = null;
   
+  private isPhysicsPaused: boolean = false;
+  private physicsLoopId: number | null = null;
+  
   constructor(
     positionRef: MutableRefObject<number>,
-    pathRendererRef: MutableRefObject<any>,
-    sceneManagerRef: MutableRefObject<any>,
+    pathRendererRef: MutableRefObject<PathRendererLike | null>,
+    sceneManagerRef: MutableRefObject<SceneManagerLike | null>,
     currentAgentRef: MutableRefObject<number>,
-    animationManagerRef: MutableRefObject<any>
+    animationManagerRef: MutableRefObject<AnimationManagerLike | null>
   ) {
     this.positionRef = positionRef;
     this.pathRendererRef = pathRendererRef;
@@ -237,7 +268,7 @@ export class EnhancedMomentumScroller {
     }
   }
   
-  private handleTouchEnd(event: TouchEvent): void {
+  private handleTouchEnd(): void {
     if (!this.touchState.isActive) return;
     
     // Apply final momentum from touch gesture
@@ -254,8 +285,26 @@ export class EnhancedMomentumScroller {
   private handleClick(event: MouseEvent): void {
     if (this.isSnapping) return;
     
+    // Check if click is on audio controls (top-right area)
     const clickX = event.clientX;
+    const clickY = event.clientY;
     const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Define audio controls area (top-right corner)
+    const audioControlsArea = {
+      x: screenWidth - 200, // 200px from right edge
+      y: 0,
+      width: 200,
+      height: 100 // 100px from top
+    };
+    
+    // Check if click is within audio controls area
+    if (clickX >= audioControlsArea.x && 
+        clickY <= audioControlsArea.height) {
+      return; // Ignore clicks on audio controls
+    }
+    
     let targetSection: ScrollSection | null = null;
     
     if (clickX < screenWidth * 0.15) {
@@ -275,17 +324,16 @@ export class EnhancedMomentumScroller {
   
   private startPhysicsLoop(): void {
     const updatePhysics = () => {
-      const now = Date.now();
-      const deltaTime = now - this.lastUpdateTime || 16;
-      this.lastUpdateTime = now;
-      
-      this.updateMomentum(deltaTime);
-      this.updatePosition();
-      this.checkForAutoSnap();
-      
-      requestAnimationFrame(updatePhysics);
+      if (!this.isPhysicsPaused) {
+        const now = Date.now();
+        const deltaTime = now - this.lastUpdateTime || 16;
+        this.lastUpdateTime = now;
+        this.updateMomentum(deltaTime);
+        this.updatePosition();
+        this.checkForAutoSnap();
+      }
+      this.physicsLoopId = requestAnimationFrame(updatePhysics);
     };
-    
     updatePhysics();
   }
   
@@ -426,7 +474,9 @@ export class EnhancedMomentumScroller {
     
     this.killAllTweens();
     
-    if (!window.gsap) {
+    // Type assertion for GSAP
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) {
       this.positionRef.current = targetSection.position;
       this.updateScene();
       this.isSnapping = false;
@@ -439,10 +489,10 @@ export class EnhancedMomentumScroller {
     
     // Notify animation manager
     if (this.animationManagerRef.current) {
-      this.animationManagerRef.current.optimizeForGSAPAnimation(true);
+      this.animationManagerRef.current.optimizeForGSAPAnimation?.(true);
     }
     
-    this.currentTween = window.gsap.to(this.positionRef, {
+    this.currentTween = gsap.to(this.positionRef, {
       current: targetSection.position,
       duration: adjustedDuration,
       ease: "power2.out",
@@ -454,7 +504,7 @@ export class EnhancedMomentumScroller {
         this.lastTargetSection = targetSection;
         
         if (this.animationManagerRef.current) {
-          this.animationManagerRef.current.optimizeForGSAPAnimation(false);
+          this.animationManagerRef.current.optimizeForGSAPAnimation?.(false);
         }
       }
     });
@@ -478,7 +528,9 @@ export class EnhancedMomentumScroller {
   }
   
   private killAllTweens(): void {
-    if (window.gsap) {
+    // Type assertion for GSAP
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (gsap) {
       if (this.currentTween) {
         this.currentTween.kill();
         this.currentTween = null;
@@ -492,12 +544,12 @@ export class EnhancedMomentumScroller {
   
   private updateScene(): void {
     if (this.pathRendererRef.current) {
-      this.pathRendererRef.current.createDottedPath();
+      this.pathRendererRef.current.createDottedPath?.();
     }
     const currentAgent = Math.floor(this.positionRef.current / 60);
     if (currentAgent !== this.currentAgentRef.current && this.sceneManagerRef.current) {
       this.currentAgentRef.current = currentAgent;
-      this.sceneManagerRef.current.updateBackgroundForAgent(currentAgent);
+      this.sceneManagerRef.current.updateBackgroundForAgent?.(currentAgent);
     }
     // Play transition sound when passing through a new agent section
     if (currentAgent !== this.lastPlayedAgentIndex) {
@@ -534,5 +586,13 @@ export class EnhancedMomentumScroller {
     }
     
     this.killAllTweens();
+  }
+  
+  public pausePhysicsLoop(): void {
+    this.isPhysicsPaused = true;
+  }
+  
+  public resumePhysicsLoop(): void {
+    this.isPhysicsPaused = false;
   }
 }

@@ -23,7 +23,6 @@ class SimpleFloatingText3D {
     // Clear existing text
     this.clearText();
 
-    const textHeight = 2.5;
     const lineSpacing = 3;
     const totalHeight = (lines.length - 1) * lineSpacing;
     
@@ -185,7 +184,7 @@ class SimpleFloatingText3D {
     this.textGroup.visible = isVisible;
     
     // Update opacity smoothly
-    this.textMeshes.forEach((mesh, index) => {
+    this.textMeshes.forEach((mesh) => {
       if (mesh.material instanceof THREE.MeshBasicMaterial) {
         const targetOpacity = isVisible ? 0.9 : 0;
         mesh.material.opacity = THREE.MathUtils.lerp(mesh.material.opacity, targetOpacity, 0.1);

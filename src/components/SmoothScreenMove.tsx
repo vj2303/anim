@@ -1,24 +1,29 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, ReactNode, CSSProperties } from "react";
 
-const SmoothScreenMove = ({ children, style = {} }) => {
-  const containerRef = useRef(null);
+interface SmoothScreenMoveProps {
+  children: ReactNode;
+  style?: CSSProperties;
+}
+
+const SmoothScreenMove: React.FC<SmoothScreenMoveProps> = ({ children, style = {} }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       const { innerWidth, innerHeight } = window;
       // Calculate offset from center, normalized between -1 and 1
       const x = (e.clientX - innerWidth / 2) / (innerWidth / 2);
       const y = (e.clientY - innerHeight / 2) / (innerHeight / 2);
       // Scale down for even more subtle movement
-      target.current.x = x * 20; // max 10px left/right
-      target.current.y = y * 20; // max 10px up/down
+      target.current.x = x * 20; // max 20px left/right
+      target.current.y = y * 20; // max 20px up/down
     };
 
     window.addEventListener("mousemove", handleMouseMove);
 
-    let animationFrame;
+    let animationFrame: number;
     const animate = () => {
       // Lerp for extra smoothness
       current.current.x += (target.current.x - current.current.x) * 0.05;

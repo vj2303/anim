@@ -1,6 +1,28 @@
 import * as THREE from 'three';
 import { MutableRefObject } from 'react';
 
+// Interface for animation data
+interface AnimationData {
+  originalScale: THREE.Vector3;
+  originalPosition: THREE.Vector3;
+  originalRotation: THREE.Euler;
+  originalColor?: THREE.Color;
+  animationStartTime: number;
+  isAnimating: boolean;
+  isHovered: boolean;
+}
+
+// Interface for GSAP timeline
+interface GSAPTimeline {
+  to: (target: unknown, vars: unknown, position?: number | string) => GSAPTimeline;
+}
+
+// Interface for GSAP
+interface GSAP {
+  timeline: () => GSAPTimeline;
+  to: (target: unknown, vars: unknown) => unknown;
+}
+
 export class InteractionManager {
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
@@ -11,15 +33,7 @@ export class InteractionManager {
   private dotsGroupRef: MutableRefObject<THREE.Group | null>;
   
   // Animation state
-  private animatedObjects: Map<THREE.Object3D, {
-    originalScale: THREE.Vector3;
-    originalPosition: THREE.Vector3;
-    originalRotation: THREE.Euler;
-    originalColor?: THREE.Color;
-    animationStartTime: number;
-    isAnimating: boolean;
-    isHovered: boolean;
-  }> = new Map();
+  private animatedObjects: Map<THREE.Object3D, AnimationData> = new Map();
 
   // Track currently hovered and moving object
   private currentlyHoveredObject: THREE.Object3D | null = null;
@@ -187,8 +201,10 @@ export class InteractionManager {
     data.isHovered = false;
 
     // Return object to original state
-    if (!window.gsap) return;
-    window.gsap.to(object.scale, {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    gsap.to(object.scale, {
       x: data.originalScale.x,
       y: data.originalScale.y,
       z: data.originalScale.z,
@@ -196,7 +212,7 @@ export class InteractionManager {
       ease: "power2.out"
     });
 
-    window.gsap.to(object.position, {
+    gsap.to(object.position, {
       x: data.originalPosition.x,
       y: data.originalPosition.y,
       z: data.originalPosition.z,
@@ -209,7 +225,7 @@ export class InteractionManager {
       const mesh = object as THREE.Mesh;
       if (mesh.material && 'color' in mesh.material && mesh.material.color) {
          const color = mesh.material.color as THREE.Color;
-         window.gsap.to(color, {
+         gsap.to(color, {
            r: data.originalColor.r,
            g: data.originalColor.g,
            b: data.originalColor.b,
@@ -222,18 +238,18 @@ export class InteractionManager {
 
   // Start dot hover animation
   private startDotHoverAnimation(object: THREE.Object3D): void {
-    if (!window.gsap) return;
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     const data = this.animatedObjects.get(object)!;
     const userData = object.userData;
     
     // Different animations based on dot position
     const columnIndex = userData.columnIndex || 0;
-    const globalRowIndex = userData.globalRowIndex || 0;
     
     if (columnIndex % 2 === 0) {
       // Even columns: Scale and glow
-      window.gsap.to(object.scale, {
+      gsap.to(object.scale, {
         x: data.originalScale.x * 2,
         y: data.originalScale.y * 2,
         z: data.originalScale.z * 2,
@@ -243,13 +259,13 @@ export class InteractionManager {
     } else {
       // Odd columns: Move to side and rotate
       const direction = columnIndex % 4 === 1 ? 1 : -1;
-      window.gsap.to(object.position, {
+      gsap.to(object.position, {
         x: data.originalPosition.x + (direction * 3),
         duration: 0.4,
         ease: "back.out(1.7)"
       });
       
-      window.gsap.to(object.rotation, {
+      gsap.to(object.rotation, {
         z: data.originalRotation.z + (Math.PI * 2),
         duration: 0.6,
         ease: "power2.inOut"
@@ -263,7 +279,7 @@ export class InteractionManager {
       const originalColor = color.clone();
       data.originalColor = originalColor;
       
-      window.gsap.to(color, {
+      gsap.to(color, {
         r: Math.min(1, originalColor.r * 2),
         g: Math.min(1, originalColor.g * 2),
         b: Math.min(1, originalColor.b * 2),
@@ -275,7 +291,8 @@ export class InteractionManager {
 
   // Start shape hover animation with diverse effects
   private startShapeHoverAnimation(object: THREE.Object3D, shapeType: string): void {
-    if (!window.gsap) return;
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     const data = this.animatedObjects.get(object)!;
     const userData = object.userData;
@@ -302,7 +319,7 @@ export class InteractionManager {
         this.animateOctahedronHover(object, data, globalRowIndex);
         break;
       case 'tetrahedron':
-        this.animateTetrahedronHover(object, data, globalRowIndex);
+        this.animateTetrahedronHover(object, data);
         break;
       case 'dodecahedron':
         this.animateDodecahedronHover(object, data, globalRowIndex);
@@ -313,8 +330,11 @@ export class InteractionManager {
   }
 
   // Cube hover animation - Breaking effect
-  private animateCubeHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateCubeHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Scale up first
     timeline.to(object.scale, {
@@ -366,8 +386,11 @@ export class InteractionManager {
   }
 
   // Sphere hover animation - Bounce and roll
-  private animateSphereHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateSphereHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Bounce up
     timeline.to(object.position, {
@@ -404,8 +427,11 @@ export class InteractionManager {
   }
 
   // Cylinder hover animation - Spin and stretch
-  private animateCylinderHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateCylinderHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Stretch vertically
     timeline.to(object.scale, {
@@ -434,8 +460,11 @@ export class InteractionManager {
   }
 
   // Cone hover animation - Flip and fly
-  private animateConeHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateConeHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Flip upside down
     timeline.to(object.rotation, {
@@ -464,8 +493,11 @@ export class InteractionManager {
   }
 
   // Torus hover animation - Spiral and expand
-  private animateTorusHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateTorusHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Expand and rotate
     timeline.to(object.scale, {
@@ -487,7 +519,6 @@ export class InteractionManager {
     
     // Spiral movement
     const spiralRadius = 3;
-    const spiralTurns = 2;
     timeline.to(object.position, {
       x: data.originalPosition.x + Math.cos(globalRowIndex * 0.1) * spiralRadius,
       y: data.originalPosition.y + Math.sin(globalRowIndex * 0.1) * 2,
@@ -498,8 +529,11 @@ export class InteractionManager {
   }
 
   // Octahedron hover animation - Explode effect
-  private animateOctahedronHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateOctahedronHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Scale up dramatically
     timeline.to(object.scale, {
@@ -531,8 +565,11 @@ export class InteractionManager {
   }
 
   // Tetrahedron hover animation - Tumble and bounce
-  private animateTetrahedronHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateTetrahedronHover(object: THREE.Object3D, data: AnimationData): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Tumble rotation
     timeline.to(object.rotation, {
@@ -579,8 +616,11 @@ export class InteractionManager {
   }
 
   // Dodecahedron hover animation - Morph and float
-  private animateDodecahedronHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateDodecahedronHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Float up with gentle oscillation
     timeline.to(object.position, {
@@ -623,8 +663,11 @@ export class InteractionManager {
   }
 
   // Generic shape hover animation
-  private animateGenericShapeHover(object: THREE.Object3D, data: any, globalRowIndex: number): void {
-    const timeline = window.gsap.timeline();
+  private animateGenericShapeHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
+    
+    const timeline = gsap.timeline();
     
     // Random movement pattern
     const pattern = globalRowIndex % 4;
@@ -672,13 +715,14 @@ export class InteractionManager {
 
   // Start milestone text hover animation with unique effects
   private startMilestoneTextHoverAnimation(object: THREE.Object3D): void {
-    if (!window.gsap) return;
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     const data = this.animatedObjects.get(object)!;
     const userData = object.userData;
     const milestoneCount = userData.milestoneCount || 0;
     
-    const timeline = window.gsap.timeline();
+    const timeline = gsap.timeline();
     
     // Different effects based on milestone number
     if (milestoneCount % 3 === 0) {
@@ -722,13 +766,14 @@ export class InteractionManager {
 
   // Start agent box hover animation with dramatic effects
   private startAgentBoxHoverAnimation(object: THREE.Object3D): void {
-    if (!window.gsap) return;
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     const data = this.animatedObjects.get(object)!;
     const userData = object.userData;
     const agentIndex = userData.agentIndex || 0;
     
-    const timeline = window.gsap.timeline();
+    const timeline = gsap.timeline();
     
     // Different effects based on agent index
     if (agentIndex % 4 === 0) {
@@ -790,13 +835,14 @@ export class InteractionManager {
 
   // Start generic object hover animation
   private startGenericObjectHoverAnimation(object: THREE.Object3D): void {
-    if (!window.gsap) return;
+    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+    if (!gsap) return;
 
     const data = this.animatedObjects.get(object)!;
     const userData = object.userData;
     const globalRowIndex = userData.globalRowIndex || 0;
     
-    const timeline = window.gsap.timeline();
+    const timeline = gsap.timeline();
     
     // Random effect based on object index
     const effect = globalRowIndex % 5;
@@ -879,7 +925,7 @@ export class InteractionManager {
     const now = Date.now();
     
     // Clean up finished animations
-    this.animatedObjects.forEach((data, object) => {
+    this.animatedObjects.forEach((data) => {
       if (data.isAnimating && now - data.animationStartTime > 2000) {
         data.isAnimating = false;
       }
@@ -891,12 +937,4 @@ export class InteractionManager {
     this.animatedObjects.clear();
     this.currentlyHoveredObject = null;
   }
-} 
-
-
-
-
-
-
-
-
+}

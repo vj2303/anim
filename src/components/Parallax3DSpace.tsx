@@ -1,6 +1,11 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, ReactNode } from "react";
 
-const Parallax3DSpace = ({ children, maxOffset = 20 }) => {
+interface Parallax3DSpaceProps {
+  children: ReactNode;
+  maxOffset?: number;
+}
+
+const Parallax3DSpace: React.FC<Parallax3DSpaceProps> = ({ children, maxOffset = 20 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });

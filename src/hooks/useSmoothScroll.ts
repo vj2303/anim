@@ -1,5 +1,10 @@
 import { useRef, useCallback, MutableRefObject } from 'react';
 
+// Define GSAP tween interface for better typing
+interface GSAPTween {
+  kill(): void;
+}
+
 interface SmoothScrollOptions {
   duration?: number;
   ease?: string;
@@ -11,11 +16,11 @@ export function useSmoothScroll(
   options: SmoothScrollOptions = {}
 ) {
   const { duration = 0.5, ease = "power2.out", onUpdate } = options;
-  const currentTweenRef = useRef<any>(null);
+  const currentTweenRef = useRef<GSAPTween | null>(null);
   const targetPositionRef = useRef<number>(0);
 
   const scrollTo = useCallback((targetPosition: number) => {
-    if (!window.gsap) return;
+    if (!(window as any).gsap) return;
 
     // Kill any existing tween
     if (currentTweenRef.current) {
@@ -25,7 +30,7 @@ export function useSmoothScroll(
     targetPositionRef.current = targetPosition;
 
     // Create smooth tween
-    currentTweenRef.current = window.gsap.to(positionRef, {
+    currentTweenRef.current = (window as any).gsap.to(positionRef, {
       current: targetPosition,
       duration: duration,
       ease: ease,
@@ -34,7 +39,7 @@ export function useSmoothScroll(
           onUpdate(positionRef.current);
         }
       }
-    });
+    }) as GSAPTween;
   }, [positionRef, duration, ease, onUpdate]);
 
   const scrollBy = useCallback((delta: number) => {
@@ -55,4 +60,4 @@ export function useSmoothScroll(
     stopScroll,
     targetPosition: targetPositionRef.current
   };
-} 
+}
