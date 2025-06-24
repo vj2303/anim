@@ -6,6 +6,9 @@ interface MomentumScrollerConfig {
   snapRadius: number;
   minSnapVelocity: number;
   maxSnapVelocity: number;
+  smoothingFactor: number;
+  velocityDecay: number;
+  accelerationMultiplier: number;
 }
 
 interface ScrollSection {
@@ -43,6 +46,35 @@ interface GSAP {
   to: (target: unknown, vars: unknown) => GSAPTween;
 }
 
+// Enhanced easing functions for smoother animations
+class SmoothEasing {
+  static easeOutCubic(t: number): number {
+    return 1 - Math.pow(1 - t, 3);
+  }
+  
+  static easeOutQuart(t: number): number {
+    return 1 - Math.pow(1 - t, 4);
+  }
+  
+  static easeOutExpo(t: number): number {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+  
+  static easeOutBack(t: number): number {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+  
+  static easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+  
+  static easeInOutQuart(t: number): number {
+    return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2;
+  }
+}
+
 export class EnhancedMomentumScroller {
   private positionRef: MutableRefObject<number>;
   private pathRendererRef: MutableRefObject<PathRendererLike | null>;
@@ -50,55 +82,69 @@ export class EnhancedMomentumScroller {
   private currentAgentRef: MutableRefObject<number>;
   private animationManagerRef: MutableRefObject<AnimationManagerLike | null>;
   
-  // Momentum physics
+  // Enhanced momentum physics
   private velocity: number = 0;
   private acceleration: number = 0;
-  private friction: number = 0.02;
-  private maxVelocity: number = 20;
-  private minVelocity: number = 0.05;
+  private friction: number = 0.015; // Reduced for smoother deceleration
+  private maxVelocity: number = 25; // Increased for more responsive feel
+  private minVelocity: number = 0.02; // Reduced for longer momentum
+  private smoothingFactor: number = 0.08; // For position interpolation
   
-  // Scrolling state
+  // Enhanced scrolling state
   private isScrolling: boolean = false;
   private isSnapping: boolean = false;
   private lastUpdateTime: number = 0;
   private accumulatedDelta: number = 0;
+  private targetPosition: number = 0; // For smooth interpolation
   
   // Section management
   private sections: ScrollSection[] = [];
   private nearestSection: ScrollSection | null = null;
   private lastTargetSection: ScrollSection | null = null;
   
-  // Input handling
+  // Enhanced input handling
   private inputAccumulator: number = 0;
   private inputTimeout: NodeJS.Timeout | null = null;
   private lastInputTime: number = 0;
+  private inputVelocity: number = 0; // Track input velocity separately
   
-  // Touch handling
+  // Enhanced touch handling
   private touchState = {
     startY: 0,
     lastY: 0,
     startTime: 0,
     isActive: false,
-    velocity: 0
+    velocity: 0,
+    lastVelocity: 0,
+    acceleration: 0
   };
   
   // GSAP references
   private currentTween: GSAPTween | null = null;
   private momentumTween: GSAPTween | null = null;
   
-  // Configuration
+  // Enhanced configuration
   private config: MomentumScrollerConfig = {
-    friction: 0.92,
-    snapStrength: 1.5,
-    snapRadius: 25,
-    minSnapVelocity: 0.1,
-    maxSnapVelocity: 20
+    friction: 0.94, // Increased for smoother deceleration
+    snapStrength: 1.8, // Increased for stronger snapping
+    snapRadius: 30, // Increased snap radius
+    minSnapVelocity: 0.08, // Reduced for easier snapping
+    maxSnapVelocity: 25, // Increased max velocity
+    smoothingFactor: 0.06, // For position smoothing
+    velocityDecay: 0.98, // For velocity decay
+    accelerationMultiplier: 1.2 // For more responsive acceleration
   };
   
   private lastPlayedAgentIndex: number | null = null;
   
   private isPhysicsPaused: boolean = false;
   private physicsLoopId: number | null = null;
+  
+  // Performance optimization
+  private frameCount: number = 0;
+  private lastFrameTime: number = 0;
+  private targetFPS: number = 60;
+  private frameInterval: number = 1000 / 60;
   
   constructor(
     positionRef: MutableRefObject<number>,
@@ -121,25 +167,25 @@ export class EnhancedMomentumScroller {
   private generateSections(): void {
     this.sections = [];
     
-    // Generate comprehensive section map
+    // Generate comprehensive section map with enhanced spacing
     for (let pos = 0; pos <= 3000; pos++) {
       if (pos === 0) {
-        this.sections.push({ position: 0, type: 'agent', magnetism: 100, snapDuration: 1.5 });
+        this.sections.push({ position: 0, type: 'agent', magnetism: 100, snapDuration: 1.8 });
       } else if (pos % 60 === 0) {
         // AI Agents - highest priority
-        this.sections.push({ position: pos, type: 'agent', magnetism: 100, snapDuration: 1.8 });
+        this.sections.push({ position: pos, type: 'agent', magnetism: 100, snapDuration: 2.0 });
       } else if (pos % 40 === 0) {
         // Milestone markers - high priority
-        this.sections.push({ position: pos, type: 'milestone', magnetism: 85, snapDuration: 1.4 });
+        this.sections.push({ position: pos, type: 'milestone', magnetism: 90, snapDuration: 1.6 });
       } else if (pos % 15 === 0) {
         // Shape sections - medium priority
-        this.sections.push({ position: pos, type: 'shape', magnetism: 70, snapDuration: 1.0 });
+        this.sections.push({ position: pos, type: 'shape', magnetism: 75, snapDuration: 1.2 });
       } else if (pos % 8 === 0) {
         // Decorative elements - lower priority
-        this.sections.push({ position: pos, type: 'decorative', magnetism: 55, snapDuration: 0.8 });
+        this.sections.push({ position: pos, type: 'decorative', magnetism: 60, snapDuration: 1.0 });
       } else if (pos % 3 === 0) {
         // Micro sections for ultra-smooth scrolling
-        this.sections.push({ position: pos, type: 'micro', magnetism: 30, snapDuration: 0.4 });
+        this.sections.push({ position: pos, type: 'micro', magnetism: 35, snapDuration: 0.6 });
       }
     }
     
@@ -162,27 +208,31 @@ export class EnhancedMomentumScroller {
     
     const now = Date.now();
     const delta = event.deltaY;
-    const intensity = Math.min(Math.abs(delta), 120);
+    const intensity = Math.min(Math.abs(delta), 150); // Increased max intensity
     const direction = Math.sign(delta);
     
-    // Add input to accumulator with momentum
-    this.inputAccumulator += direction * intensity * 0.008;
+    // Enhanced input accumulation with momentum
+    this.inputAccumulator += direction * intensity * 0.01; // Increased sensitivity
     this.lastInputTime = now;
     this.isScrolling = true;
     
-    // Apply immediate momentum
-    this.velocity += direction * intensity * 0.012;
+    // Enhanced immediate momentum with acceleration
+    const acceleration = direction * intensity * 0.015 * this.config.accelerationMultiplier;
+    this.velocity += acceleration;
     this.velocity = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.velocity));
+    
+    // Track input velocity for better momentum
+    this.inputVelocity = direction * intensity * 0.02;
     
     // Clear existing input timeout
     if (this.inputTimeout) {
       clearTimeout(this.inputTimeout);
     }
     
-    // Set timeout to detect scroll end
+    // Set timeout to detect scroll end with enhanced duration
     this.inputTimeout = setTimeout(() => {
       this.handleInputEnd();
-    }, 150);
+    }, 200); // Increased timeout for better momentum
   }
   
   private handleKeyDown(event: KeyboardEvent): void {
@@ -237,7 +287,9 @@ export class EnhancedMomentumScroller {
         lastY: touch.clientY,
         startTime: Date.now(),
         isActive: true,
-        velocity: 0
+        velocity: 0,
+        lastVelocity: 0,
+        acceleration: 0
       };
       
       // Stop any ongoing momentum
@@ -255,12 +307,17 @@ export class EnhancedMomentumScroller {
     const now = Date.now();
     const timeDelta = now - this.touchState.startTime;
     
-    if (Math.abs(deltaY) > 2) {
-      // Calculate touch velocity
-      this.touchState.velocity = deltaY / Math.max(timeDelta, 1) * 50;
+    if (Math.abs(deltaY) > 1) { // Reduced threshold for more responsive touch
+      // Enhanced touch velocity calculation
+      this.touchState.lastVelocity = this.touchState.velocity;
+      this.touchState.velocity = deltaY / Math.max(timeDelta, 1) * 60; // Increased multiplier
       
-      // Apply immediate movement
-      this.velocity += deltaY * 0.15;
+      // Calculate acceleration for smoother feel
+      this.touchState.acceleration = (this.touchState.velocity - this.touchState.lastVelocity) / Math.max(timeDelta, 1);
+      
+      // Apply enhanced immediate movement with acceleration
+      const enhancedDelta = deltaY * 0.18; // Increased sensitivity
+      this.velocity += enhancedDelta;
       this.velocity = Math.max(-this.maxVelocity, Math.min(this.maxVelocity, this.velocity));
       
       this.touchState.lastY = currentY;
@@ -271,15 +328,17 @@ export class EnhancedMomentumScroller {
   private handleTouchEnd(): void {
     if (!this.touchState.isActive) return;
     
-    // Apply final momentum from touch gesture
-    const finalVelocity = Math.max(-30, Math.min(30, this.touchState.velocity));
-    this.velocity += finalVelocity * 0.3;
+    // Enhanced final momentum from touch gesture with acceleration
+    const finalVelocity = Math.max(-35, Math.min(35, this.touchState.velocity));
+    const accelerationBoost = this.touchState.acceleration * 0.5;
+    
+    this.velocity += finalVelocity * 0.35 + accelerationBoost; // Increased momentum transfer
     
     this.touchState.isActive = false;
     
     setTimeout(() => {
       this.handleInputEnd();
-    }, 100);
+    }, 150); // Increased timeout for better momentum
   }
   
   private handleClick(event: MouseEvent): void {

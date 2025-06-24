@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MutableRefObject } from 'react';
 import { TextureManager } from './TextureManager';
 import { AIAgents } from '../constants/AIAgents';
+import { Color } from 'three';
 
 export class ShapeManager {
   private textureManager: TextureManager;
@@ -535,51 +536,51 @@ export class ShapeManager {
   }
 
   private getMainShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // Create alternating left-right pattern for main shapes
-    const positionIndex = Math.floor(globalRowIndex / 15) % 8; // 8 different position patterns
-    
+    // Stronger offset from path center and add vertical separation
+    const minOffset = screenWidth * 0.18; // Increased minimum horizontal distance
+    const minVerticalOffset = 4; // Minimum vertical distance from path (dotted path is at y=0)
+    const positionIndex = Math.floor(globalRowIndex / 15) % 8;
     let xOffset = 0;
-    let yOffset = 12; // Base height
-    
+    let yOffset = 12;
     switch (positionIndex) {
-      case 0: // Left side of path
-        xOffset = curveOffset - screenWidth * 0.2;
-        yOffset = 10;
+      case 0:
+        xOffset = curveOffset - Math.max(screenWidth * 0.25, minOffset);
+        yOffset = 10 + minVerticalOffset;
         break;
-      case 1: // Right side of path
-        xOffset = curveOffset + screenWidth * 0.2;
-        yOffset = 14;
+      case 1:
+        xOffset = curveOffset + Math.max(screenWidth * 0.25, minOffset);
+        yOffset = 14 + minVerticalOffset;
         break;
-      case 2: // Far left
-        xOffset = curveOffset - screenWidth * 0.35;
-        yOffset = 8;
+      case 2:
+        xOffset = curveOffset - Math.max(screenWidth * 0.4, minOffset);
+        yOffset = 8 + minVerticalOffset;
         break;
-      case 3: // Far right
-        xOffset = curveOffset + screenWidth * 0.35;
-        yOffset = 16;
+      case 3:
+        xOffset = curveOffset + Math.max(screenWidth * 0.4, minOffset);
+        yOffset = 16 + minVerticalOffset;
         break;
-      case 4: // Medium left, elevated
-        xOffset = curveOffset - screenWidth * 0.15;
-        yOffset = 18;
+      case 4:
+        xOffset = curveOffset - Math.max(screenWidth * 0.2, minOffset);
+        yOffset = 18 + minVerticalOffset;
         break;
-      case 5: // Medium right, elevated
-        xOffset = curveOffset + screenWidth * 0.15;
-        yOffset = 20;
+      case 5:
+        xOffset = curveOffset + Math.max(screenWidth * 0.2, minOffset);
+        yOffset = 20 + minVerticalOffset;
         break;
-      case 6: // Very far left
-        xOffset = curveOffset - screenWidth * 0.45;
-        yOffset = 6;
+      case 6:
+        xOffset = curveOffset - Math.max(screenWidth * 0.5, minOffset);
+        yOffset = 6 + minVerticalOffset;
         break;
-      case 7: // Very far right
-        xOffset = curveOffset + screenWidth * 0.45;
-        yOffset = 22;
+      case 7:
+        xOffset = curveOffset + Math.max(screenWidth * 0.5, minOffset);
+        yOffset = 22 + minVerticalOffset;
         break;
+      default:
+        xOffset = curveOffset + (globalRowIndex % 2 === 0 ? -minOffset : minOffset);
+        yOffset = 12 + minVerticalOffset;
     }
-    
-    // Add some organic variation
     const organicX = Math.sin(globalRowIndex * 0.1) * (screenWidth * 0.02);
     const organicY = Math.cos(globalRowIndex * 0.08) * 2;
-    
     return {
       x: xOffset + organicX,
       y: yOffset + organicY
@@ -587,92 +588,180 @@ export class ShapeManager {
   }
 
   private getDecorativeShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // Left-right distribution for decorative shapes
-    const positionIndex = globalRowIndex % 10; // 10 different decorative patterns
-    
+    // Stronger offset from path center and add vertical separation
+    const minOffset = screenWidth * 0.12;
+    const minVerticalOffset = 3;
+    const positionIndex = globalRowIndex % 10;
     let xOffset = 0;
-    let yOffset = 6; // Lower base height
-    
+    let yOffset = 6;
     switch (positionIndex) {
-      case 0: // Close left
-        xOffset = curveOffset - screenWidth * 0.12;
-        yOffset = 4;
+      case 0:
+        xOffset = curveOffset - Math.max(screenWidth * 0.18, minOffset);
+        yOffset = 4 + minVerticalOffset;
         break;
-      case 1: // Close right
-        xOffset = curveOffset + screenWidth * 0.12;
-        yOffset = 8;
+      case 1:
+        xOffset = curveOffset + Math.max(screenWidth * 0.18, minOffset);
+        yOffset = 8 + minVerticalOffset;
         break;
-      case 2: // Medium left
-        xOffset = curveOffset - screenWidth * 0.25;
-        yOffset = 6;
+      case 2:
+        xOffset = curveOffset - Math.max(screenWidth * 0.3, minOffset);
+        yOffset = 6 + minVerticalOffset;
         break;
-      case 3: // Medium right
-        xOffset = curveOffset + screenWidth * 0.25;
-        yOffset = 10;
+      case 3:
+        xOffset = curveOffset + Math.max(screenWidth * 0.3, minOffset);
+        yOffset = 10 + minVerticalOffset;
         break;
-      case 4: // Far left, low
-        xOffset = curveOffset - screenWidth * 0.4;
-        yOffset = 3;
+      case 4:
+        xOffset = curveOffset - Math.max(screenWidth * 0.45, minOffset);
+        yOffset = 3 + minVerticalOffset;
         break;
-      case 5: // Far right, low
-        xOffset = curveOffset + screenWidth * 0.4;
-        yOffset = 3;
+      case 5:
+        xOffset = curveOffset + Math.max(screenWidth * 0.45, minOffset);
+        yOffset = 3 + minVerticalOffset;
         break;
-      case 6: // Left side, elevated
-        xOffset = curveOffset - screenWidth * 0.18;
-        yOffset = 12;
+      case 6:
+        xOffset = curveOffset - Math.max(screenWidth * 0.22, minOffset);
+        yOffset = 12 + minVerticalOffset;
         break;
-      case 7: // Right side, elevated
-        xOffset = curveOffset + screenWidth * 0.18;
-        yOffset = 12;
+      case 7:
+        xOffset = curveOffset + Math.max(screenWidth * 0.22, minOffset);
+        yOffset = 12 + minVerticalOffset;
         break;
-      case 8: // Very far left, high
-        xOffset = curveOffset - screenWidth * 0.5;
-        yOffset = 15;
+      case 8:
+        xOffset = curveOffset - Math.max(screenWidth * 0.55, minOffset);
+        yOffset = 15 + minVerticalOffset;
         break;
-      case 9: // Very far right, high
-        xOffset = curveOffset + screenWidth * 0.5;
-        yOffset = 15;
+      case 9:
+        xOffset = curveOffset + Math.max(screenWidth * 0.55, minOffset);
+        yOffset = 15 + minVerticalOffset;
         break;
+      default:
+        xOffset = curveOffset + (globalRowIndex % 2 === 0 ? -minOffset : minOffset);
+        yOffset = 6 + minVerticalOffset;
     }
-    
-    // Add more random variation for decorative shapes
     const randomX = (Math.sin(globalRowIndex * 0.33) * 0.5 + Math.cos(globalRowIndex * 0.47) * 0.3) * screenWidth * 0.03;
     const randomY = Math.sin(globalRowIndex * 0.19) * 2;
-    
     return {
       x: xOffset + randomX,
-      y: Math.max(2, yOffset + randomY) // Ensure minimum height of 2
+      y: Math.max(2 + minVerticalOffset, yOffset + randomY)
     };
   }
 
   private getMilestoneShapePosition(globalRowIndex: number, curveOffset: number, screenWidth: number): { x: number, y: number } {
-    // Left-right alternating pattern for milestone elements
+    // Stronger offset from path center and add vertical separation
+    const minOffset = screenWidth * 0.15;
+    const minVerticalOffset = 6;
     const milestoneIndex = Math.floor(globalRowIndex / 40) % 4;
-    
     let xOffset = curveOffset;
-    let yOffset = 25; // High base height for visibility
-    
+    let yOffset = 25;
     switch (milestoneIndex) {
-      case 0: // Left side
-        xOffset = curveOffset - screenWidth * 0.15;
-        yOffset = 22;
+      case 0:
+        xOffset = curveOffset - Math.max(screenWidth * 0.2, minOffset);
+        yOffset = 22 + minVerticalOffset;
         break;
-      case 1: // Right side
-        xOffset = curveOffset + screenWidth * 0.15;
-        yOffset = 22;
+      case 1:
+        xOffset = curveOffset + Math.max(screenWidth * 0.2, minOffset);
+        yOffset = 22 + minVerticalOffset;
         break;
-      case 2: // Far left
-        xOffset = curveOffset - screenWidth * 0.25;
-        yOffset = 25;
+      case 2:
+        xOffset = curveOffset - Math.max(screenWidth * 0.3, minOffset);
+        yOffset = 25 + minVerticalOffset;
         break;
-      case 3: // Far right
-        xOffset = curveOffset + screenWidth * 0.25;
-        yOffset = 25;
+      case 3:
+        xOffset = curveOffset + Math.max(screenWidth * 0.3, minOffset);
+        yOffset = 25 + minVerticalOffset;
         break;
+      default:
+        xOffset = curveOffset + (globalRowIndex % 2 === 0 ? -minOffset : minOffset);
+        yOffset = 25 + minVerticalOffset;
     }
-    
     return { x: xOffset, y: yOffset };
+  }
+
+  /**
+   * Creates a group of 8 smaller cubes positioned to fill the original cube's volume.
+   * @param originalMesh The original cube mesh to break apart
+   * @returns THREE.Group containing 8 smaller cubes
+   */
+  public createBrokenCubePieces(originalMesh: THREE.Mesh): THREE.Group {
+    const group = new THREE.Group();
+    const originalSize = (originalMesh.geometry as THREE.BoxGeometry).parameters.width || 6;
+    const pieceSize = originalSize / 2;
+    const offsets = [-0.25, 0.25]; // Center offsets for 2x2x2 grid
+    const material = (originalMesh.material as THREE.Material).clone();
+
+    for (let x of offsets) {
+      for (let y of offsets) {
+        for (let z of offsets) {
+          const piece = new THREE.Mesh(
+            new THREE.BoxGeometry(pieceSize, pieceSize, pieceSize),
+            material.clone()
+          );
+          piece.position.set(
+            x * originalSize,
+            y * originalSize,
+            z * originalSize
+          );
+          // Match world position/rotation/scale
+          piece.position.applyEuler(originalMesh.rotation);
+          piece.position.add(originalMesh.position);
+          piece.rotation.copy(originalMesh.rotation);
+          piece.scale.copy(originalMesh.scale);
+          group.add(piece);
+        }
+      }
+    }
+    group.position.copy(originalMesh.position);
+    group.rotation.copy(originalMesh.rotation);
+    group.scale.copy(originalMesh.scale);
+    return group;
+  }
+
+  /**
+   * Create breakable cubes for both sides of the path (returns an array of two meshes)
+   */
+  public createBreakableCubesBothSides(globalRowIndex: number, curveOffset: number, distance: number): THREE.Mesh[] {
+    const size = 6;
+    const cameraDistance = 25;
+    const fov = 75;
+    const screenWidth = 2 * Math.tan((fov * Math.PI / 180) / 2) * cameraDistance;
+    const color = new Color(0xffa500); // Orange
+    // Place cubes with strong horizontal and vertical offset from the path
+    const minHorizontalOffset = screenWidth * 0.22;
+    const verticalOffset = 8; // Always above the path
+    // Left cube
+    const leftGeometry = new THREE.BoxGeometry(size, size, size);
+    const leftMaterial = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.95 });
+    const leftMesh = new THREE.Mesh(leftGeometry, leftMaterial);
+    leftMesh.castShadow = true;
+    leftMesh.receiveShadow = true;
+    leftMesh.userData = {
+      isClickable: true,
+      shapeType: 'breakable_cube',
+      shapeName: 'Breakable Cube',
+      shapeIndex: -1,
+      globalRowIndex: globalRowIndex
+    };
+    leftMesh.position.set(curveOffset - minHorizontalOffset, verticalOffset, -distance);
+    // No animation or rotation
+
+    // Right cube
+    const rightGeometry = new THREE.BoxGeometry(size, size, size);
+    const rightMaterial = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.95 });
+    const rightMesh = new THREE.Mesh(rightGeometry, rightMaterial);
+    rightMesh.castShadow = true;
+    rightMesh.receiveShadow = true;
+    rightMesh.userData = {
+      isClickable: true,
+      shapeType: 'breakable_cube',
+      shapeName: 'Breakable Cube',
+      shapeIndex: -1,
+      globalRowIndex: globalRowIndex
+    };
+    rightMesh.position.set(curveOffset + minHorizontalOffset, verticalOffset, -distance);
+    // No animation or rotation
+
+    return [leftMesh, rightMesh];
   }
 
   // Add cleanup method

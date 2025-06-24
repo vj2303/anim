@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MutableRefObject } from 'react';
+import { ShapeManager } from './ShapeManager';
 
 // Interface for animation data
 interface AnimationData {
@@ -39,6 +40,11 @@ export class InteractionManager {
   private currentlyHoveredObject: THREE.Object3D | null = null;
   private movingObject: THREE.Object3D | null = null;
 
+  // Add a ShapeManager instance for breaking effect
+  private shapeManager: ShapeManager | null = null;
+  // Track broken cube state
+  private brokenCubeMap: Map<THREE.Object3D, THREE.Group> = new Map();
+
   constructor(
     cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>,
     sceneRef: MutableRefObject<THREE.Scene | null>,
@@ -53,6 +59,7 @@ export class InteractionManager {
     this.cardsGroupRef = cardsGroupRef;
     this.textGroupRef = textGroupRef;
     this.dotsGroupRef = dotsGroupRef;
+    this.shapeManager = new ShapeManager(cameraRef);
   }
 
   // Handle mouse move events for hover detection and real-time movement
@@ -195,6 +202,14 @@ export class InteractionManager {
 
   // Stop hover animation on an object
   private stopHoverAnimation(object: THREE.Object3D): void {
+    // Restore broken cube if needed
+    if (this.brokenCubeMap.has(object) && this.cardsGroupRef.current) {
+      const piecesGroup = this.brokenCubeMap.get(object)!;
+      this.cardsGroupRef.current.remove(piecesGroup);
+      this.cardsGroupRef.current.add(object);
+      this.brokenCubeMap.delete(object);
+    }
+
     const data = this.animatedObjects.get(object);
     if (!data) return;
 
@@ -291,6 +306,47 @@ export class InteractionManager {
 
   // Start shape hover animation with diverse effects
   private startShapeHoverAnimation(object: THREE.Object3D, shapeType: string): void {
+    if ((shapeType === 'cube' || shapeType === 'breakable_cube') && this.shapeManager && this.cardsGroupRef.current) {
+      // Only break if not already broken
+      if (!this.brokenCubeMap.has(object)) {
+        // Remove original cube
+        this.cardsGroupRef.current.remove(object);
+        // Create pieces
+        const piecesGroup = this.shapeManager.createBrokenCubePieces(object as THREE.Mesh);
+        this.cardsGroupRef.current.add(piecesGroup);
+        this.brokenCubeMap.set(object, piecesGroup);
+        // Animate pieces outward (no pre-break movement)
+        const gsap = (window as unknown as { gsap?: GSAP }).gsap;
+        if (gsap) {
+          piecesGroup.children.forEach((piece, i) => {
+            const dir = new THREE.Vector3(
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2
+            ).normalize();
+            const distance = 3 + Math.random() * 2;
+            gsap.to(piece.position, {
+              x: piece.position.x + dir.x * distance,
+              y: piece.position.y + dir.y * distance,
+              z: piece.position.z + dir.z * distance,
+              duration: 0.7,
+              ease: 'power2.out',
+              delay: i * 0.03
+            });
+            gsap.to(piece.rotation, {
+              x: piece.rotation.x + Math.random() * Math.PI,
+              y: piece.rotation.y + Math.random() * Math.PI,
+              z: piece.rotation.z + Math.random() * Math.PI,
+              duration: 0.7,
+              ease: 'power2.out',
+              delay: i * 0.03
+            });
+          });
+        }
+      }
+      return;
+    }
+
     const gsap = (window as unknown as { gsap?: GSAP }).gsap;
     if (!gsap) return;
 
@@ -300,9 +356,6 @@ export class InteractionManager {
     
     // Different animations based on shape type and position
     switch (shapeType) {
-      case 'cube':
-        this.animateCubeHover(object, data, globalRowIndex);
-        break;
       case 'sphere':
         this.animateSphereHover(object, data, globalRowIndex);
         break;
@@ -326,62 +379,6 @@ export class InteractionManager {
         break;
       default:
         this.animateGenericShapeHover(object, data, globalRowIndex);
-    }
-  }
-
-  // Cube hover animation - Breaking effect
-  private animateCubeHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
-    const gsap = (window as unknown as { gsap?: GSAP }).gsap;
-    if (!gsap) return;
-    
-    const timeline = gsap.timeline();
-    
-    // Scale up first
-    timeline.to(object.scale, {
-      x: data.originalScale.x * 1.4,
-      y: data.originalScale.y * 1.4,
-      z: data.originalScale.z * 1.4,
-      duration: 0.2,
-      ease: "power2.out"
-    });
-    
-    // Break apart effect - move corners outward
-    const direction = globalRowIndex % 2 === 0 ? 1 : -1;
-    timeline.to(object.position, {
-      x: data.originalPosition.x + (direction * 2),
-      y: data.originalPosition.y + 1,
-      duration: 0.3,
-      ease: "back.out(1.7)"
-    }, 0.1);
-    
-    // Rotate and shake
-    timeline.to(object.rotation, {
-      x: data.originalRotation.x + (Math.PI * 0.1),
-      y: data.originalRotation.y + (Math.PI * 0.2),
-      z: data.originalRotation.z + (Math.PI * 0.1),
-      duration: 0.4,
-      ease: "power2.inOut"
-    }, 0.1);
-    
-    // Add color flash
-    const mesh = object as THREE.Mesh;
-    if (mesh.material && 'color' in mesh.material && mesh.material.color) {
-      const color = mesh.material.color as THREE.Color;
-      const originalColor = color.clone();
-      data.originalColor = originalColor;
-      
-      timeline.to(color, {
-        r: 1,
-        g: 0.8,
-        b: 0.2,
-        duration: 0.2
-      }, 0)
-      .to(color, {
-        r: originalColor.r,
-        g: originalColor.g,
-        b: originalColor.b,
-        duration: 0.3
-      }, 0.3);
     }
   }
 
@@ -666,51 +663,25 @@ export class InteractionManager {
   private animateGenericShapeHover(object: THREE.Object3D, data: AnimationData, globalRowIndex: number): void {
     const gsap = (window as unknown as { gsap?: GSAP }).gsap;
     if (!gsap) return;
-    
     const timeline = gsap.timeline();
-    
-    // Random movement pattern
-    const pattern = globalRowIndex % 4;
-    switch (pattern) {
-      case 0: // Scale and rotate
-        timeline.to(object.scale, {
-          x: data.originalScale.x * 1.4,
-          y: data.originalScale.y * 1.4,
-          z: data.originalScale.z * 1.4,
-          duration: 0.4,
-          ease: "elastic.out(1, 0.5)"
-        });
-        break;
-      case 1: // Move left
-        timeline.to(object.position, {
-          x: data.originalPosition.x - 3,
-          duration: 0.5,
-          ease: "back.out(1.7)"
-        });
-        break;
-      case 2: // Move right and up
-        timeline.to(object.position, {
-          x: data.originalPosition.x + 3,
-          y: data.originalPosition.y + 2,
-          duration: 0.5,
-          ease: "power2.out"
-        });
-        break;
-      case 3: // Spin and scale
-        timeline.to(object.rotation, {
-          y: data.originalRotation.y + (Math.PI * 3),
-          duration: 0.8,
-          ease: "power2.inOut"
-        });
-        timeline.to(object.scale, {
-          x: data.originalScale.x * 1.2,
-          y: data.originalScale.y * 1.2,
-          z: data.originalScale.z * 1.2,
-          duration: 0.4,
-          ease: "power2.out"
-        }, 0);
-        break;
-    }
+    // Smooth, predictable motion for all generic shapes
+    timeline.to(object.scale, {
+      x: data.originalScale.x * 1.25,
+      y: data.originalScale.y * 1.25,
+      z: data.originalScale.z * 1.25,
+      duration: 0.4,
+      ease: "elastic.out(1, 0.5)"
+    });
+    timeline.to(object.position, {
+      y: data.originalPosition.y + 2.5,
+      duration: 0.5,
+      ease: "power2.out"
+    }, 0);
+    timeline.to(object.rotation, {
+      y: data.originalRotation.y + Math.PI * 0.5,
+      duration: 0.6,
+      ease: "power2.inOut"
+    }, 0);
   }
 
   // Start milestone text hover animation with unique effects

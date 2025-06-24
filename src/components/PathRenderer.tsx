@@ -89,6 +89,9 @@ export class PathRenderer {
       // Calculate rounded curve with smooth transitions
       const curveOffset = this.calculateRoundedCurve(globalRowIndex);
       
+      // Calculate elevation for helix effect
+      const elevation = this.calculateHelixElevation(globalRowIndex);
+      
       // Create 6 dots per row spread across full screen width
       for (let col = 0; col < 6; col++) {
         const dotMaterial = new THREE.MeshBasicMaterial({ 
@@ -110,8 +113,9 @@ export class PathRenderer {
         // Spread dots across full screen width (left edge to right edge)
         const xPos = (col / 5) * screenWidth - (screenWidth / 2) + curveOffset;
         const zPos = -distance;
+        const yPos = elevation; // Add elevation for helix effect
         
-        dot.position.set(xPos, 0.01, zPos);
+        dot.position.set(xPos, yPos, zPos);
         
         // Store additional data for enhanced animations
         dot.userData = {
@@ -133,24 +137,41 @@ export class PathRenderer {
       // Add milestone text every 40 dots - using ShapeManager
       if (globalRowIndex > 0 && globalRowIndex % 40 === 0) {
         const milestoneText = this.shapeManager.createMilestoneText(globalRowIndex, curveOffset, distance);
+        // Apply elevation to milestone text
+        milestoneText.position.y = elevation;
         this.textGroupRef.current.add(milestoneText);
       }
 
     
       if (globalRowIndex > 0 && globalRowIndex % 60 === 0) {
         const agentBox = this.shapeManager.createAgentBox(globalRowIndex, curveOffset, distance);
+        // Apply elevation to agent box
+        agentBox.position.y = elevation;
         this.cardsGroupRef.current.add(agentBox);
       }
 
       // Add various 3D shapes every 15 dots for more variety - using ShapeManager
       if (globalRowIndex > 0 && globalRowIndex % 15 === 0 && globalRowIndex % 60 !== 0) {
         const variousShape = this.shapeManager.createVariousShapes(globalRowIndex, curveOffset, distance);
+        // Apply elevation to various shapes
+        variousShape.position.y = elevation;
         this.cardsGroupRef.current.add(variousShape);
+      }
+
+      // Add breakable cubes on both sides every 50 dots
+      if (globalRowIndex > 0 && globalRowIndex % 50 === 0 && this.cardsGroupRef.current) {
+        const breakableCubes = this.shapeManager.createBreakableCubesBothSides(globalRowIndex, curveOffset, distance);
+        breakableCubes.forEach(cube => {
+          cube.position.y = elevation;
+          this.cardsGroupRef.current!.add(cube);
+        });
       }
 
       // Add smaller decorative shapes every 8 dots - using ShapeManager
       if (globalRowIndex > 0 && globalRowIndex % 8 === 0 && globalRowIndex % 15 !== 0) {
         const decorativeShape = this.shapeManager.createDecorativeShapes(globalRowIndex, curveOffset, distance);
+        // Apply elevation to decorative shapes
+        decorativeShape.position.y = elevation;
         this.cardsGroupRef.current.add(decorativeShape);
       }
     }
@@ -162,137 +183,36 @@ export class PathRenderer {
     const fov = 75;
     const screenWidth = 2 * Math.tan((fov * Math.PI / 180) / 2) * cameraDistance;
     
-    // Row 0-1: Keep straight (no curve)
-    if (globalRowIndex <= 1) {
-        return 0;
-    }
+    // Create a helix-like structure starting immediately
+    // Parameters for the helix
+    const helixRadius = screenWidth * 0.25; // Radius of the helix
+    const helixPitch = 0.3; // How tight the helix is (smaller = tighter)
+    const helixSpeed = 0.1; // Speed of rotation along the helix
     
-    // Rows 2-40: Create smooth circular curved pattern
-    if (globalRowIndex >= 2 && globalRowIndex <= 40) {
-        const curveStartRow = 2;
-        const curveEndRow = 40;
-        const totalCurveRows = curveEndRow - curveStartRow + 1;
-        
-        // Calculate progress through the curve (0 to 1)
-        const curveProgress = (globalRowIndex - curveStartRow) / (totalCurveRows - 1);
-        
-        // Create a circular arc - simulate traveling along a large circle's circumference
-        const circleAngle = curveProgress * (Math.PI / 2); // 0 to 90 degrees
-        
-        // Define the radius of the virtual circle we're following
-        const circleRadius = screenWidth * 0.8; // Large radius for gentle curve
-        
-        // Calculate position on the circle
-        const circleX = Math.sin(circleAngle) * circleRadius;
-        
-        // Center the curve and scale appropriately
-        const maxOffset = screenWidth * 0.35;
-        const curveOffset = (circleX / circleRadius) * maxOffset;
-        
-        // Apply smooth easing for more natural feel
-        const easedProgress = this.smoothStep(curveProgress);
-        const smoothCurveOffset = curveOffset * easedProgress;
-        
-      
-        const secondaryRadius = screenWidth * 0.15;
-        const secondaryAngle = curveProgress * Math.PI;
-        const secondaryOffset = Math.sin(secondaryAngle) * secondaryRadius * 0.2;
-        
-        // Combine primary circular curve with subtle secondary wave
-        const finalOffset = smoothCurveOffset + secondaryOffset;
-        
-        // REDUCED organic variation for smoother movement
-        const organicVariation = Math.sin(globalRowIndex * 0.02) * (screenWidth * 0.003) +
-                                Math.cos(globalRowIndex * 0.015) * (screenWidth * 0.002);
-        
-        // Progressive intensity
-        const progressiveMultiplier = 0.7 + (curveProgress * 0.3);
-        
-        return (finalOffset * progressiveMultiplier) + organicVariation;
-    }
+    // Calculate the angle for the helix - start immediately from row 0
+    const angle = globalRowIndex * helixSpeed;
     
-    // After row 40: IMPROVED smooth alternating curve pattern
-    const sectionSize = 80;
-    const adjustedIndex = globalRowIndex - 41;
+    // Create the main helix curve
+    const xOffset = Math.cos(angle) * helixRadius;
     
-    // IMPROVED transition from rounded curve to alternating pattern
-    if (adjustedIndex < 20) { // Extended transition zone
-        const transitionProgress = adjustedIndex / 20; // Smoother transition
-        const smoothTransition = this.smoothStep(transitionProgress);
-        
-        // Start from the end of the rounded curve
-        const roundedEndOffset = screenWidth * 0.25; // Reduced for smoother transition
-        
-        // Calculate where the alternating pattern would start
-        const sectionNumber = Math.floor(adjustedIndex / sectionSize);
-        const positionInSection = adjustedIndex % sectionSize;
-        const progress = positionInSection / (sectionSize - 1);
-        const isLeftToRight = sectionNumber % 2 === 0;
-        
-        const curveRange = screenWidth * 0.2; // Reduced range for smoother movement
-        let alternatingOffset: number;
-        if (isLeftToRight) {
-            alternatingOffset = -curveRange + (2 * curveRange) * this.smoothStep(progress);
-        } else {
-            alternatingOffset = curveRange - (2 * curveRange) * this.smoothStep(progress);
-        }
-        
-        // Smooth transition from rounded curve end to alternating pattern
-        return roundedEndOffset + (alternatingOffset - roundedEndOffset) * smoothTransition;
-    }
+    // Add a secondary wave for more organic movement
+    const secondaryWave = Math.sin(angle * 2) * (screenWidth * 0.05);
     
-    // Regular alternating curve pattern - IMPROVED smoothing
-    const sectionNumber = Math.floor(adjustedIndex / sectionSize);
-    const positionInSection = adjustedIndex % sectionSize;
+    // Add a tertiary wave for even more complexity
+    const tertiaryWave = Math.cos(angle * 3) * (screenWidth * 0.02);
     
-    // Calculate progress within current section (0 to 1)
-    const progress = positionInSection / (sectionSize - 1);
+    // Combine all waves for the final helix effect
+    const helixOffset = xOffset + secondaryWave + tertiaryWave;
     
-    // Determine curve direction based on section number
-    const isLeftToRight = sectionNumber % 2 === 0;
+    // Add some organic variation for natural feel
+    const organicVariation = Math.sin(globalRowIndex * 0.015) * (screenWidth * 0.01) +
+                            Math.cos(globalRowIndex * 0.025) * (screenWidth * 0.005);
     
-    // IMPROVED: Smoother curve using enhanced sine function
-    const curveIntensity = 1.2; // Reduced intensity for smoother movement
-    const curvedProgress = this.smoothStep(progress); // Apply smooth step to progress
+    // Apply smooth easing for natural transitions - start immediately
+    const progress = Math.min(1, globalRowIndex / 10); // Faster transition over first 10 rows
+    const easedProgress = this.smoothStep(progress);
     
-    // Define centered curve range
-    const curveRange = screenWidth * 0.2; // Reduced range
-    
-    // Calculate the main curved path based on direction, centered around 0
-    let xPosition: number;
-    if (isLeftToRight) {
-        xPosition = -curveRange + (2 * curveRange) * curvedProgress;
-    } else {
-        xPosition = curveRange - (2 * curveRange) * curvedProgress;
-    }
-    
-    // REDUCED additional curvature for smoother movement
-    const additionalCurveAmount = screenWidth * 0.04; // Reduced
-    const additionalCurve = Math.sin(progress * Math.PI) * additionalCurveAmount;
-    if (isLeftToRight) {
-        xPosition += additionalCurve;
-    } else {
-        xPosition -= additionalCurve;
-    }
-    
-    // REDUCED vertical influence for smoother movement
-    const verticalInfluenceAmount = screenWidth * 0.02; // Reduced
-    const verticalInfluence = Math.cos(progress * Math.PI * 2) * verticalInfluenceAmount;
-    if (isLeftToRight) {
-        xPosition += verticalInfluence;
-    } else {
-        xPosition -= verticalInfluence;
-    }
-    
-    // REDUCED organic variation for ultra-smooth movement
-    const organicVariation = Math.sin(globalRowIndex * 0.015) * (screenWidth * 0.005) +
-                            Math.cos(globalRowIndex * 0.035) * (screenWidth * 0.003);
-    
-    // Ensure the final position stays centered
-    const maxOffset = screenWidth * 0.3; // Reduced max offset
-    xPosition = Math.max(-maxOffset, Math.min(maxOffset, xPosition));
-    
-    return xPosition + organicVariation;
+    return helixOffset * easedProgress + organicVariation;
   }
 
   // Enhanced smoothStep function for better transitions
@@ -347,6 +267,33 @@ export class PathRenderer {
     const elevationFrequency = 3; // Number of hills/valleys around the circle
     
     return Math.sin(currentAngle * elevationFrequency) * elevationAmplitude;
+  }
+
+  // Calculate elevation for helix effect
+  private calculateHelixElevation(globalRowIndex: number): number {
+    // Parameters for the helix elevation
+    const elevationAmplitude = 3; // Height variation in units
+    const elevationSpeed = 0.15; // Speed of vertical movement
+    
+    // Calculate the elevation angle - start immediately from row 0
+    const elevationAngle = globalRowIndex * elevationSpeed;
+    
+    // Create the main elevation wave
+    const mainElevation = Math.sin(elevationAngle) * elevationAmplitude;
+    
+    // Add a secondary elevation wave for more complex movement
+    const secondaryElevation = Math.cos(elevationAngle * 2) * (elevationAmplitude * 0.3);
+    
+    // Add some organic variation
+    const organicVariation = Math.sin(globalRowIndex * 0.02) * 0.5;
+    
+    // Apply smooth easing for natural transitions - start immediately
+    const progress = Math.min(1, globalRowIndex / 10); // Faster transition over first 10 rows
+    const easedProgress = this.smoothStep(progress);
+    
+    // Start from ground level and gradually apply elevation
+    const baseHeight = 0.01; // Slight elevation from ground
+    return baseHeight + (mainElevation + secondaryElevation + organicVariation) * easedProgress;
   }
 
   private getDotColor(globalRowIndex: number, curveOffset: number): number {

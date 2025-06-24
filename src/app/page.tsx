@@ -12,6 +12,13 @@ import { AgentNameOverlay } from '../components/AgentNameOverlay';
 import { useGSAP } from '../hooks/useGSAP';
 import Parallax3DSpace from '@/components/Parallax3DSpace';
 import SimpleAudioManagerComponent from '@/components/SimpleAudioManager';
+import gsap from 'gsap';
+import { Canvas } from '@react-three/fiber';
+import { BreakableCube } from '../components/BreakableCube';
+
+if (typeof window !== 'undefined') {
+  (window as any).gsap = gsap;
+}
 
 export default function DottedPath() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -248,34 +255,10 @@ export default function DottedPath() {
   }, []);
 
   return (
-    <div style={{
-      margin: 0,
-      padding: 0,
-      boxSizing: 'border-box',
-      height: '100vh',
-      overflow: 'hidden',
-      fontFamily: 'Arial, sans-serif',
-      background: 'linear-gradient(#ffffff, #ffffff)'
-    }}>
-      <Parallax3DSpace maxOffset={20}>
-        <div 
-          ref={containerRef}
-          style={{
-            position: 'relative',
-            width: '100%',
-            height: '100%'
-          }}
-        />
-      </Parallax3DSpace>
-      
+    <div ref={containerRef} style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      {/* Existing Three.js scene is rendered here by appending renderer.domElement */}
       {/* Audio Manager for Background Music */}
-      <SimpleAudioManagerComponent 
-        audioSrc="/bg-music.mp3"
-        autoPlay={true}
-        loop={true}
-        volume={0.3}
-        showControls={true}
-      />
+      <SimpleAudioManagerComponent />
     </div>
   );
 }
