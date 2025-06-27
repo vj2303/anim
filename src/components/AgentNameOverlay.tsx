@@ -159,6 +159,12 @@ export class AgentNameOverlay {
     });
 
     this.currentOverlayText = new THREE.Mesh(textGeometry, material);
+    // Add userData for click interaction
+    this.currentOverlayText.userData = {
+      isClickable: true,
+      shapeType: 'agent_overlay',
+      agentIndex: agentIndex
+    };
     this.overlayGroup.add(this.currentOverlayText);
   }
 
@@ -319,4 +325,10 @@ export class AgentNameOverlay {
       this.overlayGroup = null;
     }
   }
+
+  public getOverlayGroup(): THREE.Group | null {
+    return this.overlayGroup;
+  }
 }
+
+

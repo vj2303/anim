@@ -45,12 +45,17 @@ export class InteractionManager {
   // Track broken cube state
   private brokenCubeMap: Map<THREE.Object3D, THREE.Group> = new Map();
 
+  private onAgentClick?: (agentIndex: number, position: THREE.Vector3) => void;
+  private onSplineClick?: (sceneUrl: string) => void;
+
   constructor(
     cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>,
     sceneRef: MutableRefObject<THREE.Scene | null>,
     cardsGroupRef: MutableRefObject<THREE.Group | null>,
     textGroupRef: MutableRefObject<THREE.Group | null>,
-    dotsGroupRef: MutableRefObject<THREE.Group | null>
+    dotsGroupRef: MutableRefObject<THREE.Group | null>,
+    onAgentClick?: (agentIndex: number, position: THREE.Vector3) => void,
+    onSplineClick?: (sceneUrl: string) => void
   ) {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
@@ -60,6 +65,8 @@ export class InteractionManager {
     this.textGroupRef = textGroupRef;
     this.dotsGroupRef = dotsGroupRef;
     this.shapeManager = new ShapeManager(cameraRef);
+    this.onAgentClick = onAgentClick;
+    this.onSplineClick = onSplineClick;
   }
 
   // Handle mouse move events for hover detection and real-time movement
@@ -908,4 +915,69 @@ export class InteractionManager {
     this.animatedObjects.clear();
     this.currentlyHoveredObject = null;
   }
+
+  public handleClick = (event: MouseEvent, overlayGroup?: THREE.Group | null): void => {
+    if (!this.cameraRef.current || !this.sceneRef.current) return;
+    const domElement = (event.currentTarget as HTMLElement) || window;
+    const rect = domElement.getBoundingClientRect ? domElement.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.cameraRef.current);
+
+    // Collect all interactive objects
+    const interactiveObjects: THREE.Object3D[] = [];
+    if (this.cardsGroupRef.current) {
+      this.cardsGroupRef.current.children.forEach(child => {
+        if (child.userData?.isClickable) {
+          interactiveObjects.push(child);
+        }
+        // Also check children of group (e.g., agent text mesh)
+        if (child.children) {
+          child.children.forEach(grandChild => {
+            if (grandChild.userData?.isClickable) {
+              interactiveObjects.push(grandChild);
+            }
+          });
+        }
+      });
+    }
+    if (this.textGroupRef.current) {
+      this.textGroupRef.current.children.forEach(child => {
+        if (child.userData?.isClickable) {
+          interactiveObjects.push(child);
+        }
+      });
+    }
+    if (this.dotsGroupRef.current) {
+      this.dotsGroupRef.current.children.forEach(child => {
+        if (child.userData?.isClickable) {
+          interactiveObjects.push(child);
+        }
+      });
+    }
+    // Add overlayGroup children if provided
+    if (overlayGroup) {
+      overlayGroup.children.forEach(child => {
+        if (child.userData?.isClickable) {
+          interactiveObjects.push(child);
+        }
+      });
+    }
+    const intersects = this.raycaster.intersectObjects(interactiveObjects, true);
+    if (intersects.length > 0) {
+      const mesh = intersects[0].object;
+      if (
+        (mesh.userData?.shapeType === 'ai_agent' || mesh.userData?.shapeType === 'ai_agent_text' || mesh.userData?.shapeType === 'agent_overlay') &&
+        typeof mesh.userData.agentIndex === 'number'
+      ) {
+        if (this.onAgentClick) {
+          this.onAgentClick(mesh.userData.agentIndex, mesh.position.clone());
+        }
+      } else if (mesh.userData?.shapeType === 'spline' && mesh.userData?.splineSceneUrl) {
+        if (this.onSplineClick) {
+          this.onSplineClick(mesh.userData.splineSceneUrl);
+        }
+      }
+    }
+  };
 }

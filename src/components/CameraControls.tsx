@@ -47,12 +47,13 @@ export class CameraControls {
   }
 
   private onMouseDown(event: MouseEvent): void {
+    if (!this.enabled) return;
     this.isDragging = true;
     this.previousMousePosition = { x: event.clientX, y: event.clientY };
   }
 
   private onMouseMove(event: MouseEvent): void {
-    if (!this.isDragging) return;
+    if (!this.isDragging || !this.enabled) return;
 
     const deltaMove = {
       x: event.clientX - this.previousMousePosition.x,
@@ -73,7 +74,7 @@ export class CameraControls {
   }
 
   private onWheel(event: WheelEvent): void {
-    if (event.ctrlKey) return; // Let path navigation handle this
+    if (event.ctrlKey || !this.enabled) return; // Let path navigation handle this
     
     const scale = event.deltaY > 0 ? 1.05 : 0.95;
     const newDistance = this.spherical.radius * scale;

@@ -4,6 +4,7 @@ import { TextureManager } from './TextureManager';
 import { AIAgents } from '../constants/AIAgents';
 import { SimpleFloatingText3D } from './FloatingText3D';
 import { ShapeManager } from './ShapeManager';
+import Spline from '@splinetool/react-spline';
 
 export class PathRenderer {
   private dotsGroupRef: MutableRefObject<THREE.Group | null>;
@@ -58,6 +59,80 @@ export class PathRenderer {
   public dispose(): void {
     this.milestoneTextMeshes.clear();
     this.shapeManager.dispose();
+  }
+
+  // Method to create Spline object at specified position
+  private createSplineObject(globalRowIndex: number, curveOffset: number, distance: number, elevation: number): THREE.Group {
+    const splineGroup = new THREE.Group();
+    
+    // Create a placeholder geometry for the Spline object
+    const placeholderGeometry = new THREE.BoxGeometry(8, 8, 8);
+    const placeholderMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.3,
+      wireframe: true
+    });
+    
+    const placeholderMesh = new THREE.Mesh(placeholderGeometry, placeholderMaterial);
+    
+    // Add glow effect
+    const glowGeometry = new THREE.BoxGeometry(10, 10, 10);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.BackSide
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    
+    splineGroup.add(placeholderMesh);
+    splineGroup.add(glowMesh);
+    
+    // Position the group
+    splineGroup.position.set(curveOffset, elevation, -distance);
+    
+    // Store metadata for the Spline object
+    splineGroup.userData = {
+      isSplineObject: true,
+      splineSceneUrl: 'https://prod.spline.design/PBQQBw8bfXDhBo7w/scene.splinecode',
+      globalRowIndex,
+      curveOffset,
+      distance,
+      elevation,
+      shapeType: 'spline',
+      shapeName: `3D Spline Scene ${globalRowIndex}`,
+      isClickable: true
+    };
+    
+    // Add floating animation
+    this.addSplineAnimation(placeholderMesh, globalRowIndex);
+    
+    return splineGroup;
+  }
+
+  // Add floating animation to Spline placeholder
+  private addSplineAnimation(mesh: THREE.Mesh, globalRowIndex: number): void {
+    const originalY = mesh.position.y;
+    
+    const animate = () => {
+      const time = Date.now() * 0.001;
+      const floatOffset = Math.sin(time * 0.6 + globalRowIndex * 0.15) * 0.8;
+      const rotationSpeed = 0.4;
+      
+      mesh.position.y = originalY + floatOffset;
+      mesh.rotation.x += 0.01;
+      mesh.rotation.y += 0.015;
+      mesh.rotation.z += 0.008;
+      
+      // Add pulsing glow effect
+      const pulseScale = 1 + Math.sin(time * 2 + globalRowIndex * 0.3) * 0.1;
+      mesh.scale.setScalar(pulseScale);
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
   }
 
   // Updated createDottedPath method using ShapeManager
@@ -173,6 +248,12 @@ export class PathRenderer {
         // Apply elevation to decorative shapes
         decorativeShape.position.y = elevation;
         this.cardsGroupRef.current.add(decorativeShape);
+      }
+
+      // Add Spline 3D object every 45 dots
+      if (globalRowIndex > 0 && globalRowIndex % 45 === 0) {
+        const splineGroup = this.createSplineObject(globalRowIndex, curveOffset, distance, elevation + 2);
+        this.cardsGroupRef.current.add(splineGroup);
       }
     }
   }
@@ -327,4 +408,37 @@ export class PathRenderer {
     
     this.dotsGroupRef.current?.add(marker);
   }
+
+  // Expose floatingText3D instance
+  public getFloatingText3D(): SimpleFloatingText3D {
+    return this.floatingText3D;
+  }
+
+  // Show agent description in FloatingText3D at a given position
+  public showAgentDescriptionFloatingText(agent: { name: string; description: string }, position: { x: number, y: number, z: number } = { x: 0, y: 20, z: -30 }): void {
+    // Remove previous floating text from scene
+    if (this.textGroupRef.current) {
+      this.textGroupRef.current.remove(this.floatingText3D.getGroup());
+    }
+    // Create new floating text
+    this.floatingText3D.createFloatingText([
+      agent.name,
+      agent.description
+    ], position, this.cameraRef);
+    // Add to scene
+    if (this.textGroupRef.current) {
+      this.textGroupRef.current.add(this.floatingText3D.getGroup());
+    }
+    this.floatingText3D.updateVisibility(true);
+  }
+
+  // Hide the floating text
+  public hideAgentDescriptionFloatingText(): void {
+    this.floatingText3D.clearText();
+    if (this.textGroupRef.current) {
+      this.textGroupRef.current.remove(this.floatingText3D.getGroup());
+    }
+  }
 }
+
+
