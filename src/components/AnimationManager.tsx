@@ -17,6 +17,7 @@ export class AnimationManager {
   private positionRef: MutableRefObject<number>;
   private cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>;
   private textureManager: TextureManager;
+  private onCameraPositionChange?: () => void;
   
   // Speed control properties - optimized for GSAP
   private scrollSpeed: number = 0.01; // Reduced since GSAP handles smoothing
@@ -38,12 +39,14 @@ export class AnimationManager {
     dotsArrayRef: MutableRefObject<THREE.Mesh[]>,
     textMeshesRef: MutableRefObject<THREE.Mesh[]>,
     positionRef: MutableRefObject<number>,
-    cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>
+    cameraRef: MutableRefObject<THREE.PerspectiveCamera | null>,
+    onCameraPositionChange?: () => void
   ) {
     this.dotsArrayRef = dotsArrayRef;
     this.textMeshesRef = textMeshesRef;
     this.positionRef = positionRef;
     this.cameraRef = cameraRef;
+    this.onCameraPositionChange = onCameraPositionChange;
     this.textureManager = new TextureManager();
     this.lastPosition = positionRef.current;
   }
@@ -103,6 +106,10 @@ export class AnimationManager {
     const fovVariation = velocityIntensity * 2;
     camera.fov = baseFOV + fovVariation;
     camera.updateProjectionMatrix();
+
+    if (this.onCameraPositionChange) {
+      this.onCameraPositionChange();
+    }
   }
 
   // Enhanced blinking animation with motion responsiveness

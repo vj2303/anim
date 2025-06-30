@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { SceneManager } from '../components/SceneManager';
 import { CameraControls } from '../components/CameraControls';
+import { CursorCameraMovement } from '../components/CursorCameraMovement';
 import { PathRenderer } from '../components/PathRenderer';
 import { AnimationManager } from '../components/AnimationManager';
 import { EnhancedMomentumScroller } from '../components/EnhancedMomentumScroller';
@@ -29,6 +30,7 @@ export default function DottedPath() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<CameraControls | null>(null);
+  const cursorCameraMovementRef = useRef<CursorCameraMovement | null>(null);
   const animationIdRef = useRef<number | null>(null);
   
   // Path state
@@ -99,8 +101,18 @@ export default function DottedPath() {
     containerElement.appendChild(renderer.domElement);
 
     // Initialize camera controls
-    const cameraControls = new CameraControls(camera, renderer.domElement);
+    const cameraControls = new CameraControls(camera, renderer.domElement, () => {
+      // Update cursor camera movement base position when camera position changes
+      if (cursorCameraMovementRef.current) {
+        cursorCameraMovementRef.current.updateBasePosition();
+      }
+    });
     controlsRef.current = cameraControls;
+
+    // Initialize cursor camera movement
+    const cursorCameraMovement = new CursorCameraMovement(camera, renderer.domElement);
+    cursorCameraMovement.setBaseTarget(new THREE.Vector3(0, 5, 0));
+    cursorCameraMovementRef.current = cursorCameraMovement;
 
     // Initialize agent info manager
     const agentInfoManager = new AgentInfoManager(sceneRef, cameraRef, controlsRef);
@@ -140,7 +152,13 @@ export default function DottedPath() {
       dotsArrayRef,
       textMeshesRef,
       positionRef,
-      cameraRef
+      cameraRef,
+      () => {
+        // Update cursor camera movement base position when camera position changes
+        if (cursorCameraMovementRef.current) {
+          cursorCameraMovementRef.current.updateBasePosition();
+        }
+      }
     );
     animationManagerRef.current = animationManager;
     animationManager.setPathRenderer(pathRendererRef);
@@ -206,6 +224,11 @@ export default function DottedPath() {
         controlsRef.current.update();
       }
       
+      // Update cursor camera movement after camera controls
+      if (cursorCameraMovementRef.current) {
+        cursorCameraMovementRef.current.update();
+      }
+      
       animationManager.animate();
       
       // Update momentum scroller
@@ -253,6 +276,10 @@ export default function DottedPath() {
       
       if (controlsRef.current?.dispose) {
         controlsRef.current.dispose();
+      }
+      
+      if (cursorCameraMovementRef.current) {
+        cursorCameraMovementRef.current.dispose();
       }
       
       if (pathRendererRef.current) {

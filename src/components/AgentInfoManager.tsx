@@ -66,14 +66,29 @@ export class AgentInfoManager {
     // Optionally, disable scrolling on the body
     document.body.style.overflow = 'hidden';
 
-    // Animate in
-    this.agentInfoGroup.scale.set(0, 0, 0);
+    // Animate in with scale and slight Y rotation for a dynamic pop effect
+    this.agentInfoGroup.scale.set(0.7, 0.7, 0.7);
+    this.agentInfoGroup.rotation.set(0, -0.3, 0);
     gsap.to(this.agentInfoGroup.scale, {
-      x: 1,
-      y: 1,
-      z: 1,
-      duration: 0.6,
-      ease: 'back.out(1.7)'
+      x: 1.1,
+      y: 1.1,
+      z: 1.1,
+      duration: 0.35,
+      ease: 'back.out(2)',
+      onComplete: () => {
+        gsap.to(this.agentInfoGroup.scale, {
+          x: 1,
+          y: 1,
+          z: 1,
+          duration: 0.18,
+          ease: 'power2.out'
+        });
+      }
+    });
+    gsap.to(this.agentInfoGroup.rotation, {
+      y: 0,
+      duration: 0.5,
+      ease: 'power2.out'
     });
 
     // Create back button

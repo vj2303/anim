@@ -3,6 +3,7 @@ import * as THREE from 'three';
 export class CameraControls {
   private camera: THREE.PerspectiveCamera;
   private domElement: HTMLElement;
+  private onPositionChange?: () => void;
   
   // Control settings
   public enabled: boolean = true;
@@ -24,9 +25,10 @@ export class CameraControls {
   private spherical: THREE.Spherical = new THREE.Spherical();
   private sphericalDelta: THREE.Spherical = new THREE.Spherical();
 
-  constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
+  constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement, onPositionChange?: () => void) {
     this.camera = camera;
     this.domElement = domElement;
+    this.onPositionChange = onPositionChange;
     
     // Set initial camera position
     this.spherical.setFromVector3(this.camera.position.clone().sub(this.target));
@@ -94,6 +96,10 @@ export class CameraControls {
     // Apply damping for smooth movement
     this.sphericalDelta.theta *= (1 - this.dampingFactor);
     this.sphericalDelta.phi *= (1 - this.dampingFactor);
+
+    if (this.onPositionChange) {
+      this.onPositionChange();
+    }
   }
 
   public dispose(): void {
